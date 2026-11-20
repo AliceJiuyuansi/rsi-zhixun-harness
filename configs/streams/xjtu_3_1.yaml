@@ -1,0 +1,32 @@
+name: xjtu_3_1
+description: >
+  Real run-to-failure stream from XJTU-SY Bearing3_1 (40 Hz / 10 kN, 2538 snapshots).
+  Task is normalized RUL regression; drift is natural wear-out, not synthetic.
+data:
+  kind: xjtu
+  task: regression
+  npz: data/processed/xjtu/40Hz10kN__Bearing3_1.npz
+  stride: 3          # keep every 3rd snapshot -> 846 points
+  group: 8           # one step = 8 snapshots (24 files) -> ~105 steps
+  warmup_steps: 30   # first ~29% of life is the deployment-time training set
+  label_lag: 1
+model:
+  kind: hgb_regressor
+  max_iter: 150
+  learning_rate: 0.08
+  max_leaf_nodes: 15
+  min_samples_leaf: 20
+  l2_regularization: 0.5
+policy:
+  window: 40
+  psi_threshold: 0.25
+  error_threshold: 0.06
+  retrain_cooldown: 5
+  max_retrains: 12
+  min_estimated_gain: 0.015
+  promote_margin: 0.02
+  rollback_threshold: 0.10
+  rollback_patience: 3
+  periodic_every: 20
+eval:
+  rolling_window: 8

@@ -1,0 +1,8 @@
+name: gradual
+description: Sensor bias ramps up linearly from step 40 to 120 (covariate shift).
+data:
+  drift:
+    kind: covariate_gradual
+    start: 40
+    end: 120
+    magnitude: 1.8

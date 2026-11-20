@@ -1,0 +1,8 @@
+name: lshift
+description: Class priors change at step 60, class-conditional distributions unchanged (label shift).
+data:
+  drift:
+    kind: label_shift
+    start: 60
+    priors_before: [0.40, 0.20, 0.20, 0.20]
+    priors_after:  [0.10, 0.40, 0.40, 0.10]

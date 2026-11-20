@@ -1,0 +1,7 @@
+name: concept
+description: Same sensor distribution, labels of class 1 and 2 swap at step 60 (concept drift).
+data:
+  drift:
+    kind: concept
+    start: 60
+    swap: [1, 2]

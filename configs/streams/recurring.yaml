@@ -1,0 +1,8 @@
+name: recurring
+description: Two operating regimes alternate every 30 steps (covariate shift, recurring).
+data:
+  drift:
+    kind: recurring
+    start: 40
+    period: 30
+    magnitude: 1.8

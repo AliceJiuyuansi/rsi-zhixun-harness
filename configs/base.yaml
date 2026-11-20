@@ -1,0 +1,57 @@
+# 基础配置：所有实验的默认值，stream 配置可覆盖 data.drift
+project: rsi-zhixun
+workspace: xiangxinnidexin
+
+swanlab:
+  # auto: 有凭据则 online，否则 local（不阻塞、不弹交互）
+  # online | local | offline | disabled
+  mode: auto
+
+data:
+  kind: synthetic
+  n_features: 12
+  n_classes: 4
+  n_steps: 160
+  batch_size: 64
+  sigma: 1.0
+  class_scale: 1.9
+  seed: 7
+  means_seed: 2026
+  warmup_steps: 24
+  label_lag: 1
+
+model:
+  kind: hgb
+  max_iter: 60
+  learning_rate: 0.12
+  max_leaf_nodes: 15
+  min_samples_leaf: 20
+  l2_regularization: 0.1
+  random_state: 0
+
+policy:
+  type: trigger
+  window: 40              # retrain window (steps)
+  psi_threshold: 0.25     # feature drift threshold (PSI)
+  error_threshold: 0.06   # rolling accuracy drop threshold
+  retrain_cooldown: 4     # min steps between retrains
+  max_retrains: 12
+  # 结构上限（五件套 #3 的兜底）：window 步内最多重训几次；0 = 不限。
+  # 主限速是 retrain_cooldown，这里只防"某段突然猛训"。
+  max_retrains_per_window: 8
+  max_consecutive_failures: 3   # 连续异常 -> kill-switch（自动降级）
+  max_wall_seconds: 0           # >0 时超时即冻结模型；0 = 不限
+  amplitude_factor: 2.0         # 单次参数变更不得超过上版的 2 倍
+  min_estimated_gain: 0.015
+  promote_margin: 0.02    # challenger must be within this of champion
+  rollback_threshold: 0.10
+  rollback_patience: 3
+  periodic_every: 20      # only for policy.periodic
+
+eval:
+  rolling_window: 10
+
+cost:
+  alpha_gpu: 1.0          # weight for compute seconds
+  beta_label: 0.001       # weight per labeled sample
+  gamma_token: 0.0        # weight per token

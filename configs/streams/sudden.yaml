@@ -1,0 +1,7 @@
+name: sudden
+description: Sensor bias jumps at step 60 (covariate shift).
+data:
+  drift:
+    kind: covariate_sudden
+    start: 60
+    magnitude: 2.0

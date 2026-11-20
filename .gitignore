@@ -1,0 +1,52 @@
+# æ•°æ®ä¸äº§ç‰©
+data/
+XJTU-SY_Bearing_Datasets/
+experiments/
+reports/*.pdf
+reports/*.pptx
+
+# æ¨¡å‹æƒé‡
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.h5
+*.pkl
+
+# SwanLab / å‡­æ®
+.swanlab/
+swanlog/
+.env
+*.key
+
+# æœ¬åœ°è¾“å‡ºï¼ˆé•œåƒ dry-run è½ç›˜ç­‰ï¼‰
+out/
+out_*/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ç³»ç»Ÿ
+.DS_Store
+Thumbs.db
+
+# ±¾µØÀ­È¡µÄ¹Ù·½ SDK / Æ½Ì¨Ì½²é²úÎï
+_sdk/
+platform_probe.png
+
+
+_state/
+
+
+# ±¾µØ´óÎÄ¼şÓëµÚÈı·½Ô­°ü
+dist/
+CMAPSSData/
+gas+sensor*/
+cpu-*-v1/
+ÈüÌâ¹æÔò.pdf
+

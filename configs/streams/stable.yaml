@@ -1,0 +1,5 @@
+name: stable
+description: No drift. Sanity check - every policy should stay flat.
+data:
+  drift:
+    kind: none

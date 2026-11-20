@@ -1,0 +1,31 @@
+data:
+  group: 4
+  kind: xjtu
+  label_lag: 1
+  npz: data/processed/xjtu/37.5Hz11kN__Bearing2_3.npz
+  stride: 1
+  task: regression
+  warmup_steps: 25
+description: Real run-to-failure stream from XJTU-SY Bearing2_3 (37.5 Hz / 11 kN,
+  533 snapshots). Task is normalized RUL regression.
+eval:
+  rolling_window: 8
+model:
+  kind: hgb_regressor
+  l2_regularization: 0.5
+  learning_rate: 0.08
+  max_iter: 150
+  max_leaf_nodes: 15
+  min_samples_leaf: 20
+name: xjtu_2_3
+policy:
+  error_threshold: 0.06
+  max_retrains: 12
+  min_estimated_gain: 0.015
+  periodic_every: 20
+  promote_margin: 0.02
+  psi_threshold: 0.25
+  retrain_cooldown: 5
+  rollback_patience: 3
+  rollback_threshold: 0.1
+  window: 40
