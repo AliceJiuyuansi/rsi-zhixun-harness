@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-11-20（第五段）：平台提交完成，首次试运行已排队
+
+### 完成
+
+- 镜像上传成功（`zhixun-rsi-harness:0.1`，64 MiB）；**提交版本 v1 已校验通过**
+- 表单填写：基础模型 **Qwen/Qwen3.5-4B**、训练记录 = SwanLab run `x5kz5fn7`、
+  源码 = `github.com/AliceJiuyuansi/rsi-zhixun-harness`（已 public）、PyTRiO key（新建）、
+  作品文档 = `reports/系统说明.md`
+- **首次试运行已提交**（trial，排在第 4 位；监视脚本 `_state/watch_run.py`，日志 `_state/run_watch.log`）
+- SwanLab：项目 `rsi-zhixun` 两条真实 run（static / trigger 十轮模拟，56 条记录已上传）
+- 新写 `docs/交接_2026-11-21.md`（明天一页上手）；`reports/系统说明.md`（提交三件套之一）
+
+### 待办（明天从交接单开始）
+
+1. 看试运行报告的 3 件事：每轮 `/data` 行数、父检查点路径、10 轮是否都 finish
+2. 按报告调 `decide_training_budget()`
+3. 技术报告 ≤10 页 / 演示视频 ≤5 分钟 / 来源声明
+4. 确认后再考虑「选为正式版本 + 首次正式评测」（2 次机会）
+
+### 阻塞
+
+- 试运行排队中（平台侧）；正式评测需人工确认
+
+---
+
 ## 2026-11-20（第四段）：平台开放、Harness 镜像、A 任务本地闭环
 
 ### 平台事实（登录后从页面/SDK 抓到的，可直接当已知条件）
