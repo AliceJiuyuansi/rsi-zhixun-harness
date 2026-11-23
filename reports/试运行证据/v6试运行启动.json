@@ -1,0 +1,19 @@
+{
+  "version": 6,
+  "trial_run_id": "55e728cc0ecb9885ae575788a4198741",
+  "submission_id": "4ac1c76ff953b889b5080f3701e07f95",
+  "document_id": "00c8a3ebb43cf5a0c84feb1f23d638ff",
+  "image_archive_id": "57171bf6de71af53a50a58d136e28423",
+  "image_sha256": "69d558fa3e877db1ecd5f3957ce621d94b6145df9c333531958b49250002f2c0",
+  "submission_valid": true,
+  "reference_version": 4,
+  "mode": "trial",
+  "trial_usage_at_start": {
+    "used": 6,
+    "limit": 10
+  },
+  "formal_usage_at_start": {
+    "used": 0,
+    "limit": 3
+  }
+}
