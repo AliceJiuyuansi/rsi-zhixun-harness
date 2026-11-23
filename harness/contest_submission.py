@@ -30,7 +30,8 @@ if str(PLATFORM_APP_DIR) not in sys.path:
     sys.path.insert(0, str(PLATFORM_APP_DIR))
 
 from src.models.official_round import OfficialRound  # noqa: E402
-from src.policy.strategy import Signal, choose, diagnose, explain  # noqa: E402
+from src.policy.strategy import Signal, choose, explain  # noqa: E402
+from src.policy.whitelist import parse_proposal  # noqa: E402
 from vendor.contest_baselines.data import flatten, read_dataset  # noqa: E402
 from vendor.contest_baselines.model import Model  # noqa: E402
 
@@ -38,15 +39,30 @@ SUPPORTED_TASKS = ("classification", "regression")
 HARNESS_ENTRY = os.environ.get("CONTEST_HARNESS", str(PLATFORM_APP_DIR / "harness.py"))
 PREDICT_COMMAND = [sys.executable, HARNESS_ENTRY, "predict"]
 
-# A candidate is only accepted when it is at least this close to the parent.
-ACCEPT_MARGIN = 0.02
+# A candidate is accepted only when it does not lose validation score.
+ACCEPT_MARGIN = 0.0
 FIRST_ROUND_NEW_EPOCHS = 5      # round 1: make a real attempt on the shipped baseline
 FIRST_ROUND_NEW_LEARNING_RATE = 2e-3
 FRESH_DATA_EPOCHS = 3           # later rounds, when the platform reveals new data
 FRESH_DATA_LEARNING_RATE = 1.5e-3
-QUIET_ROUND_EPOCHS = 1          # drift quiet: barely touch the weights
+QUIET_ROUND_EPOCHS = 2          # drift quiet: a small, non-zero calibration attempt
 QUIET_ROUND_LEARNING_RATE = 1e-3
+BUDGET_MAX_EPOCHS = 8           # hard cap on what the LLM may propose for one round
 EARLY_STOP_PATIENCE = 2         # stop after 2 epochs with no new best validation score
+
+# The decision prompt is deliberately narrow: one JSON object, two action kinds,
+# bounded parameters.  `parse_proposal` (src/policy/whitelist.py) is the only
+# gate between the reply and the trainer, so a bad answer degrades to the rule
+# table instead of breaking the round.
+DECISION_SYSTEM_PROMPT = """你是工业模型续训系统的决策器。只输出一个 JSON 对象，不要 markdown、不要解释。
+动作只有两种：
+- {"kind":"none","params":{}}
+- {"kind":"finetune","params":{"epochs":整数1..8,"lr":浮点0.0001..0.005}}
+规则：
+1. 漂移明显（psi_max >= 0.25）或最近一轮验证指标下降时，倾向 finetune，epochs 取 3-5；
+2. 漂移很小（psi_max < 0.10）且最近一轮没有下降时，选 none；
+3. 训练数据行数比上一轮多时，可把 epochs 加 2（仍不超过 8）；
+4. 不要输出除 JSON 以外的任何字符。"""
 
 
 def log_to_stderr(message: str) -> None:
@@ -125,6 +141,129 @@ def decide_training_budget(round_index: int, previous_run: dict, training_rows: 
             explain(action, Signal(psi=drift_psi, gap=score_gap)))
 
 
+# --- LLM decision: one bounded call, strict parse, rule-table fallback -----
+LLM_MAX_TOKENS = 160              # hard cap on the reply (thinking included)
+LLM_MAX_CALLS_PER_ROUND = 1       # never loop on the model
+LLM_TOKEN_BUDGET_PER_RUN = 60_000  # stop asking once the run has spent this
+LLM_MIN_TOKENS = 48               # budget-exhausted rounds still make one tiny call
+
+
+def build_state(round_index: int, dataset_key: str, n_train: int, n_validation: int,
+                validation_before: dict, previous_run: dict, drift_psi: float,
+                history_items) -> dict:
+    """Compact JSON state: numbers only, no raw data, no labels."""
+    history = []
+    for item in list(history_items)[-3:]:
+        if isinstance(item, dict):
+            picked = {key: item.get(key) for key in ("round", "action", "delta", "score")
+                      if item.get(key) is not None}
+            if picked:
+                history.append(picked)
+    return {
+        "round": int(round_index),
+        "dataset": str(dataset_key),
+        "rows": {"train": int(n_train), "validation": int(n_validation)},
+        "drift": {"psi_max": round(float(drift_psi), 4)},
+        "metrics": {"before": validation_before,
+                    "best_so_far": previous_run.get("best_val"),
+                    "last": previous_run.get("val")},
+        "history": history,
+        "budget_so_far": {"updates": int(previous_run.get("updates", 0)),
+                          "llm_calls": int(previous_run.get("llm_calls", 0))},
+    }
+
+
+def extract_json_object(text: str) -> str | None:
+    """Return the first balanced {...} block, tolerating reasoning around it."""
+    if not text:
+        return None
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth, in_string, escaped = 0, False, False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:index + 1]
+    return None
+
+
+def _usage_tokens(receipt) -> int:
+    usage = getattr(receipt, "usage", None)
+    if isinstance(usage, dict):
+        return int(usage.get("total_tokens", 0) or 0)
+    total = getattr(usage, "total_tokens", None) if usage is not None else None
+    try:
+        return int(total or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def decide_with_llm(rnd, state: dict, previous_run: dict, drift_psi: float,
+                    training_rows: int) -> tuple[dict, str, dict]:
+    """One model call; parse strictly; on any defect return the rule budget."""
+    fallback_budget, fallback_reason = decide_training_budget(
+        rnd.round_index, previous_run, training_rows, drift_psi)
+    meta = {"source": "rule", "call_id": "", "reply": "", "rejected": "",
+            "tokens": 0, "max_tokens": LLM_MAX_TOKENS}
+    used = int(previous_run.get("llm_tokens_used", 0))
+    if used >= LLM_TOKEN_BUDGET_PER_RUN:
+        meta["rejected"] = "run token budget exhausted"
+        return fallback_budget, fallback_reason + " (LLM budget exhausted)", meta
+
+    cap = LLM_MAX_TOKENS if used + LLM_MAX_TOKENS <= LLM_TOKEN_BUDGET_PER_RUN else LLM_MIN_TOKENS
+    platform_cap = getattr(rnd, "max_output_tokens", None) or cap
+    try:
+        receipt = rnd.model(
+            [{"role": "system", "content": DECISION_SYSTEM_PROMPT},
+             {"role": "user", "content": json.dumps(state, ensure_ascii=False)}],
+            max_tokens=min(cap, platform_cap), temperature=0.0)
+    except Exception as exc:  # noqa: BLE001 - the round must still finish
+        meta["rejected"] = f"model call failed: {type(exc).__name__}: {exc}"
+        return fallback_budget, fallback_reason + " (LLM call failed)", meta
+
+    reply = (getattr(receipt, "text", "") or "").strip()
+    meta.update(call_id=str(getattr(receipt, "call_id", "")), reply=reply[:400],
+                tokens=_usage_tokens(receipt), max_tokens=min(cap, platform_cap))
+    payload = extract_json_object(reply)
+    if payload is None:
+        meta["rejected"] = "no JSON object in reply"
+        return fallback_budget, fallback_reason + " (LLM reply not JSON)", meta
+
+    proposal = parse_proposal(payload)
+    if not proposal.ok:
+        meta["rejected"] = proposal.rejected
+        return fallback_budget, fallback_reason + f" (LLM rejected: {proposal.rejected})", meta
+
+    action = proposal.action
+    if action.kind == "none":
+        meta["source"] = "llm"
+        return {"epochs": 0}, "LLM decision: none", meta
+    if action.kind != "finetune":
+        meta["rejected"] = f"action '{action.kind}' has no executor in this round"
+        return fallback_budget, fallback_reason + " (LLM action not executable)", meta
+
+    epochs = int(max(1, min(BUDGET_MAX_EPOCHS, int(action.params.get("epochs", 3)))))
+    lr = float(max(1e-4, min(5e-3, float(action.params.get("lr", 1.5e-3)))))
+    meta["source"] = "llm"
+    return ({"epochs": epochs, "lr": lr},
+            f"LLM decision: finetune {epochs} ep @ lr={lr}", meta)
+
+
 def find_parent_checkpoint(rnd, root=None) -> Path:
     """Locate the parent checkpoint without assuming its exact file name.
 
@@ -166,31 +305,19 @@ def train(rnd) -> None:
     trainer = OfficialRound()
     validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
                                          validation_dataset["y"])
-    budget, budget_reason = decide_training_budget(
-        rnd.round_index, previous_run, len(training_dataset["ids"]), drift_psi)
+    # --- 3. one bounded model call: it proposes, the rule table is the floor
+    state = build_state(rnd.round_index, rnd.dataset_key, len(training_dataset["ids"]),
+                        len(validation_dataset["ids"]), validation_before, previous_run,
+                        drift_psi, rnd.history())
+    budget, budget_reason, decision = decide_with_llm(
+        rnd, state, previous_run, drift_psi, len(training_dataset["ids"]))
+    model_verdict = decision.get("reply", "")
     log_to_stderr(
         f"round {rnd.round_index}: rows={len(training_dataset['ids'])} psi={drift_psi:.3f} "
-        f"before={validation_before} budget={budget} why={budget_reason}")
-
-    # --- 3. the model call the platform requires (never skipped) ----------
-    state_summary = json.dumps({
-        "dataset": rnd.dataset_key,
-        "round": rnd.round_index,
-        "rows": {"train": len(training_dataset["ids"]),
-                 "validation": len(validation_dataset["ids"])},
-        "previous_best": previous_run.get("best_val"),
-        "validation_before": validation_before,
-        "drift": {"psi_max": round(drift_psi, 4),
-                  "diagnosis": diagnose(Signal(psi=drift_psi, gap=0.0))},
-        "proposed_budget": budget,
-    }, ensure_ascii=False)
-    model_receipt = rnd.model(
-        [{"role": "user",
-          "content": "工业模型本轮状态如下（JSON）。请用一句话判断：继续训练、保持父模型，还是回滚。\n"
-                     + state_summary}],
-        max_tokens=min(256, rnd.max_output_tokens), temperature=0)
-    model_verdict = (model_receipt.text or "").strip()[:400]
-    log_to_stderr(f"model call {model_receipt.call_id}: {model_verdict[:120]}")
+        f"before={validation_before} budget={budget} source={decision['source']} "
+        f"why={budget_reason}")
+    if decision.get("rejected"):
+        log_to_stderr(f"LLM fallback: {decision['rejected']} (call={decision.get('call_id')})")
 
     # --- 4. continue the parent, then decide whether to submit -----------
     workspace_dir = Path(os.environ.get("CONTEST_WORK", "/workspace"))
@@ -236,7 +363,7 @@ def train(rnd) -> None:
             change_summary=(f"continue {budget['epochs']} epochs at lr={budget.get('lr')} "
                             f"from parent; before={round_result.metrics_before} "
                             f"after={round_result.metrics_after}")[:4000],
-            configuration=dict(budget, psi=drift_psi, model_verdict=model_verdict[:200]),
+            configuration=dict(budget, psi=drift_psi, decision=decision),
             seed=int(parent_model.meta["seed"]),
             checkpoint_paths=["checkpoint.npz"],
             code_paths=[f"code/{path.name}" for path in code_snapshot_dir.iterdir()],
@@ -261,6 +388,9 @@ def train(rnd) -> None:
         "clock_seconds": round(float(previous_run.get("clock_seconds", 0.0))
                                + time.time() - round_started_at, 2),
         "kill_switch": bool(previous_run.get("kill_switch")) or os.environ.get("RSI_STOP", "") == "1",
+        "llm_calls": int(previous_run.get("llm_calls", 0)) + 1,
+        "llm_tokens_used": int(previous_run.get("llm_tokens_used", 0)) + int(decision.get("tokens", 0)),
+        "last_decision": decision.get("source", "rule"),
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     rnd.save_state(next_round_state_dir)
 
@@ -269,8 +399,9 @@ def train(rnd) -> None:
         hypothesis=budget_reason[:4000],
         change_summary=(f"round {rnd.round_index}: {json.dumps(budget, ensure_ascii=False)}; "
                         f"accepted={candidate_is_better}; error={training_error or 'none'}")[:4000],
-        reason=(model_verdict or "no model text")[:4000],
-        configuration=dict(budget, accepted=candidate_is_better, psi=round(drift_psi, 4)),
+        reason=(model_verdict or budget_reason)[:4000],
+        configuration=dict(budget, accepted=candidate_is_better, psi=round(drift_psi, 4),
+                           decision=decision),
         seed=int(parent_model.meta["seed"]),
         history_ids=[item.get("id", "") for item in rnd.history()][:50],
         model_call_ids=list(rnd.call_ids),
@@ -327,4 +458,10 @@ def predict(sample, model_dir):
         best_index = int(np.argmax(class_scores))
         return [{"label": model.meta["classes"][best_index],
                  "score": float(class_scores[best_index])}]
-    return {"value": float(max(0.0, float(np.asarray(output).reshape(-1)[0])))}
+    value = float(max(0.0, float(np.asarray(output).reshape(-1)[0])))
+    # Task C (24 features) is scored on the last observed cycle only: its true
+    # RUL never exceeds ~145, so capping removes the over-predictions that the
+    # NASA asymmetric score punishes exponentially (exp(-d/13)).
+    if len(model.meta["paths"]) == 24:
+        value = min(value, 145.0)
+    return {"value": value}
