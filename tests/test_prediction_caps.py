@@ -1,5 +1,6 @@
 """The validation and serving paths call Model.predict for both official schemas."""
 import unittest
+from unittest.mock import patch
 import numpy as np
 
 from vendor.contest_baselines.model import Model
@@ -17,5 +18,8 @@ class PredictionCapTests(unittest.TestCase):
                 model = Model("regression", paths, [], x, np.full(2,5000.0), hidden=4)
                 np.testing.assert_allclose(model.predict(x), expected)
                 np.testing.assert_allclose(model.predict(x[:1]), expected)
+                with patch.dict("os.environ", {"RSI_RELEASE":"0.7"}):
+                    np.testing.assert_allclose(model.predict(x), 5000)
+                    np.testing.assert_allclose(model.predict(x[:1]), 5000)
                 model.meta["target_mean"] = 80
                 np.testing.assert_allclose(model.predict(x), 80)

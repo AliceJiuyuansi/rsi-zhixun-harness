@@ -66,8 +66,10 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # v4 ships with calibration off; v5 sets RSI_C_CALIBRATION=1 at image build time.
-C_CALIBRATION_ENABLED = os.environ.get("RSI_C_CALIBRATION", "0").strip().lower() \
-    not in ("0", "false", "no", "off", "")
+C_CALIBRATION_ENABLED = (
+    os.environ.get("RSI_RELEASE") == "0.7" or
+    os.environ.get("RSI_C_CALIBRATION", "0").strip().lower() not in ("0", "false", "no", "off", "")
+)
 STATE_SCHEMA = 2
 
 

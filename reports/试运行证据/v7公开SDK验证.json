@@ -1,0 +1,72 @@
+{
+  "A": {
+    "rows": 1244,
+    "selected_checkpoint_sha256": "e7b16b051113e94a76f87572f60da6f11c5846852cc7f02aba19028879ead45a",
+    "reference_checkpoint_sha256": "e7b16b051113e94a76f87572f60da6f11c5846852cc7f02aba19028879ead45a",
+    "max_prediction_delta_vs_reference": 0.0,
+    "reference": "v6 same ten-round public growth",
+    "macro_f1": 0.7225486238901014,
+    "accuracy": 0.882636655948553
+  },
+  "B": {
+    "rows": 1679,
+    "selected_checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78",
+    "reference_checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78",
+    "max_prediction_delta_vs_reference": 0.0,
+    "reference": "v4/v5 uncapped B same ten-round public growth",
+    "mae": 541.6890217855195,
+    "rmse": 649.6351950101174,
+    "reference_scores": {
+      "mae": 541.6890217855195,
+      "rmse": 649.6351950101174
+    },
+    "cap_on_same_weights": {
+      "1200": {
+        "mae": 541.3760773477721,
+        "rmse": 649.239422142579,
+        "affected": 3
+      },
+      "2500": {
+        "mae": 541.6890217855195,
+        "rmse": 649.6351950101174,
+        "affected": 0
+      }
+    },
+    "initial_public_three_rounds": [
+      660.388689,
+      654.969362,
+      654.969362
+    ],
+    "platform_v5_initial_public_three_rounds": [
+      660.3886889170046,
+      654.9693622975,
+      654.9693622975
+    ],
+    "platform_hidden_reference": {
+      "v5": {
+        "mae": 251.69772471042572,
+        "rmse": 352.08292078326355
+      },
+      "v6": {
+        "mae": 426.77141046633204,
+        "rmse": 569.0462418071775
+      }
+    },
+    "v7_hidden_rmse": null
+  },
+  "C": {
+    "rows": 23049,
+    "selected_checkpoint_sha256": "7b2648755d7dafa04f242ee2d4550d081b30f05cd45ff55222c7a31a940ae012",
+    "reference_checkpoint_sha256": "f47d9ce158555024114af7b9b0edd10bc030a995d551792d69de999c0701dad4",
+    "max_prediction_delta_vs_reference": 1.000444171950221e-11,
+    "reference": "v5 calibrated C fixed stage third round",
+    "mae": 36.53642467285596,
+    "rmse": 50.049433683174435,
+    "reference_scores": {
+      "mae": 36.53642467285596,
+      "rmse": 50.04943368317444
+    },
+    "nasa_score": 2377795091.348878,
+    "calibration_present": true
+  }
+}
