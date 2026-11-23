@@ -110,7 +110,7 @@ class OfficialRound:
     def continue_round(self, parent_checkpoint: str | Path, X_train, y_train,
                        X_val, y_val, *, out_dir: str | Path, epochs: int = 3,
                        learning_rate: float | None = None, batch_size: int | None = None,
-                       patience: int = 0,
+                       patience: int = 0, calibrate_c: bool = False,
                        stage_id: str = "round", hypothesis: str = "",
                        change_summary: str = "") -> RoundResult:
         """Continue the parent for up to `epochs`, keeping the best-scoring weights.
@@ -155,6 +155,14 @@ class OfficialRound:
         for _ in range(int(epochs)):
             loss = model.fit(X_train, np.asarray(y_train), 1)[0]
             epochs_run += 1
+            if calibrate_c:
+                from vendor.contest_baselines.c_calibration import fit
+                # Refit around this epoch's base prediction, never stack corrections.
+                model.meta.pop("c_calibration", None)
+                try:
+                    model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train))
+                except Exception:  # noqa: BLE001 - calibration is optional; keep training
+                    model.meta.pop("c_calibration", None)
             validation = self.evaluate(model, X_val, y_val)
             history.append({"epoch": int(model.meta["epochs"]), "step": int(model.meta["steps"]),
                             "loss": float(loss), "validation": validation})
@@ -195,6 +203,7 @@ class OfficialRound:
                     "early_stopped": bool(epochs_run < int(epochs)),
                     "learning_rate": float(model.meta["learning_rate"]),
                     "batch_size": int(model.meta["batch_size"]),
+                    "calibrate_c": bool(calibrate_c),
                     "stage_id": stage_id, "hypothesis": hypothesis,
                     "change_summary": change_summary},
         )
@@ -210,6 +219,7 @@ class OfficialRound:
                   "final_steps": result.steps_after, "training_seconds": seconds,
                   "learning_rate": result.config["learning_rate"],
                   "batch_size": result.config["batch_size"],
+                  "calibrate_c": bool(calibrate_c),
                   "validation_before": before, "validation_after": after,
                   "hypothesis": hypothesis, "change_summary": change_summary}
         (out / "training.json").write_text(
