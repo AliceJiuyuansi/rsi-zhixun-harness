@@ -1,8 +1,8 @@
-# 智训引擎 · 工业制造场景下的模型训练与超参数优化
+﻿# 智训引擎 · 工业制造场景下的模型训练与超参数优化
 
 > 第二届北京市大学生"人工智能+"创新大赛 · 赛题 9
 > 工作区根目录：`D:\Alice_AI\rsi`
-> 状态快照：2026-11-23（v2 试运行完成：B MAE/RMSE 减半、墙钟 -52%；v3 运行中）
+> 状态快照：2026-11-24（v4/v5 建版：C 无上限 + 工况校准；v2 仍是正式候选）
 
 本目录是**唯一的项目工作区**。所有规则解读、计划、实验约定、代码、配置都放在这里；
 不在微信/飞书/个人电脑桌面另起一份。
@@ -52,7 +52,8 @@
 | `docs/08_三任务落地路径.md` | **官方三个任务（气体/轴承/发动机）怎么落地**、看不懂数据时的侦察法、指标与阈值改造清单 | 技术负责人 |
 | `docs/07_操作手册.md` | **保姆级操作**：harness 要不要训练、数据处理五步、怎么测、怎么看结果、动作白名单 | 全员必读 |
 | `docs/交接_2026-11-20.md` | **一页交接单**：现状、数字、环境、待办、约束（给 dsh / 新队员） | 队长 |
-| `docs/交接_2026-11-23.md` | **最新一页交接单**：v1 试运行结果、v2 改动、第二次提交顺序 | 队长 |
+| `docs/交接_2026-11-24.md` | **最新一页交接单**：v4/v5 建版、C 校准、试运行顺序 | 队长 |
+| `docs/交接_2026-11-23.md` | 上一版交接单：v1/v2 试运行、v3 上限证伪 | 队长 |
 | `docs/status.md` | 每周进度快照（agent 交接也看这个） | 队长 |
 | `src/` | 代码（含受控五件套：`policy/whitelist|bounds|budget.py`、`harness/killswitch|guard.py`、`utils/audit.py`） | — |
 | `configs/` | YAML 配置（实验参数全在这，不写死在代码里） | — |
@@ -130,7 +131,7 @@ docker run --rm --network none zhixun-rsi:0.1
 
 # 8) v2 平台入口彩排（假宿主，不消耗平台次数）
 python scripts/test_harness_local.py --dataset A --rounds 10 --grow
-python scripts/test_harness_local.py --dataset A --rounds 3 --docker --image zhixun-rsi-harness:0.3
+python scripts/test_harness_local.py --dataset C --rounds 2 --grow --max-train-rows 8000 --docker --image zhixun-rsi-harness:0.5
 python scripts/replay_trial.py            # v1 报告 -> v2 预算回放
 ```
 
@@ -144,8 +145,8 @@ python scripts/replay_trial.py            # v1 报告 -> v2 预算回放
 
 **交付链现状**：受控五件套 5/5（`scripts/check_guard.py` 全 PASS）；
 离线镜像 `zhixun-rsi:0.1` 已构建，`docker run --network none` 断网跑通、exit 0。
-**v2 提交镜像** `zhixun-rsi-harness:0.3` 已构建（285 MB，tar 64 MB），
-`docker run --rm --network none zhixun-rsi-harness:0.3 describe` 通过；
+**v4/v5 候选镜像** `zhixun-rsi-harness:0.4/0.5` 已构建（285 MB，tar 64 MB），
+`docker run --rm --network none zhixun-rsi-harness:0.5 describe` 通过；
 v1 平台试运行报告见 `docs/status.md` / `reports/技术报告_v2.md`。
 
 > SwanLab 当前默认 `auto`：没登录时写本地 `swanlog/`（不阻塞），登录后自动上传团队空间。

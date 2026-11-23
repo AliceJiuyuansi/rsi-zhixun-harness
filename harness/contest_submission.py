@@ -65,6 +65,9 @@ WORKSPACE = Path(os.environ.get("CONTEST_WORK", "/workspace"))
 STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
+# v4 ships with calibration off; v5 sets RSI_C_CALIBRATION=1 at image build time.
+C_CALIBRATION_ENABLED = os.environ.get("RSI_C_CALIBRATION", "0").strip().lower() \
+    not in ("0", "false", "no", "off", "")
 STATE_SCHEMA = 2
 
 
@@ -269,8 +272,12 @@ def train(rnd) -> None:
     round_result = None
     training_error = ""
     outcome = None
+    calibrate_c = (C_CALIBRATION_ENABLED and rnd.dataset_key == "C"
+                   and task == "regression" and len(feature_paths) == 24)
     if int(decision["epochs"]) > 0:
         try:
+            log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
+                          f"calibrate_c={calibrate_c}")
             round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
@@ -279,7 +286,7 @@ def train(rnd) -> None:
                 epochs=int(decision["epochs"]),
                 learning_rate=float(decision["lr"]),
                 patience=EARLY_STOP_PATIENCE,
-                calibrate_c=(rnd.dataset_key == "C" and task == "regression" and len(feature_paths) == 24),
+                calibrate_c=calibrate_c,
                 stage_id=stage_id or f"round-{rnd.round_index}",
                 hypothesis=decision["reason"],
                 change_summary=json.dumps({"rule": decision["rule"],

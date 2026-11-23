@@ -1,4 +1,4 @@
-﻿# 智训引擎 · Harness 镜像（平台提交用）
+# 智训引擎 · Harness 镜像（平台提交用）
 #
 # 与 zhixun-rsi:0.1 的区别：这个镜像不跑我们自己的实验循环，而是实现平台的
 # 三合一入口 describe / train / predict，靠 SDK 与宿主通信。
@@ -13,10 +13,11 @@
 FROM python:3.11-slim
 
 LABEL org.opencontainers.image.title="zhixun-rsi-harness" \
-      org.opencontainers.image.version="0.3" \
+      org.opencontainers.image.version="0.4-0.5" \
       org.opencontainers.image.description="Contest 9 harness: offline continuation + drift-gated updates"
 
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG RSI_C_CALIBRATION=0
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
@@ -26,7 +27,8 @@ ENV PYTHONUNBUFFERED=1 \
     CONTEST_APP=/app \
     CONTEST_SUBMISSION=contest_submission \
     PYTHONPATH=/app \
-    RSI_SWAN_MODE=disabled
+    RSI_SWAN_MODE=disabled \
+    RSI_C_CALIBRATION=${RSI_C_CALIBRATION}
 
 # 1) SDK（官方 1.0.4，随平台下载包，不打网络补丁）
 COPY _sdk/contest-harness-sdk-1.0.4 /opt/contest-harness-sdk
