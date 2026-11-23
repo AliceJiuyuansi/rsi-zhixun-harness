@@ -53,6 +53,11 @@
   状态变 `valid`。短时间重复请求会 409 `校验请求过于频繁`，不要连续点。
 - 平台 `formal_limit=3`（`formal_remaining=3`），不是交接单里写的 2；试运行 `trial_used=1`。
 - 第一次试运行（`41d6c1d6…`）平台侧失败，同版本重跑后完成；失败不占次数。
+- **事实修正（SwanLab）**：`x5kz5fn7` 是本地 `simulate_a_rounds.py` 的 **static 模拟**
+  （val 0.7140、test_mean 0.399、test_worst 0.185、**0 updates**），不是平台测评；
+  `rynlo0ne`（trigger）在 `reports/sim_a_rounds.json` 里同样 **0 updates**。
+  因此旧交接单里“trigger 隐藏-like 0.339 / 多训 = 负收益”的结论**没有当前 JSON 支撑**，
+  且平台 A 实测 0.8735 说明 batch 3–10 不是可靠的 hidden 代理；v3 已不拿它设计平台预算。
 
 ### 下一步
 
