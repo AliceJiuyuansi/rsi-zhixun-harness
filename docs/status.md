@@ -33,7 +33,7 @@
   v3 = 0.3 镜像 + 含 C 题 145 上限的文档；两个版本都未消耗试运行次数。
   首次校验曾返回 `模型服务暂不可用`，退避约 2 分钟后重试成功。
 - **材料**：`reports/技术报告_v2.md`、`reports/来源声明.md`、`docs/演示视频分镜.md`、
-  `reports/v2_replay_v1.{md,json}`、`reports/系统说明.md` 已更新
+  `reports/v2_replay_v1.{md,json}`、`reports/trial_runs.md`、`reports/系统说明.md` 已更新
 
 ### 待办（第二次提交）
 
