@@ -25,19 +25,20 @@
   （RMSE 52.87→52.00，+1.65%，采纳）；容器内 `--network none` A 3 轮全 exit 0
 - **回放**：v1 报告 119 epoch → v2 63 epoch（-47%），估计少 1291 CPU 秒（-40%）；
   A 不省（更新都有收益），B/C 主要省在“被拒还重训”的轮次
-- **v2 镜像**：`zhixun-rsi-harness:0.2`（285 MB，tar 64 MB）已构建、断网 describe 通过；
-  `dist/zhixun-rsi-harness-0.2.tar` 已导出
-- **平台动作**：v2 镜像已上传（archive `88f5afb49c48e28be5101f145b1ed89f`，ready）；
-  提交版本 **v2 已创建并通过校验**（id `8636a3dcbc7536fb7a80d608f96c76f7`，
-  `Qwen/Qwen3.5-4B`，文档 `系统说明.md`，源码/训练记录同 v1，`status=valid`）。
+- **v2 镜像**：`zhixun-rsi-harness:0.3`（285 MB，tar 64 MB）已构建、断网 describe 通过；
+  `dist/zhixun-rsi-harness-0.3.tar` 已导出
+- **平台动作**：镜像已上传：v2 初版 archive `88f5afb…`、**v3 最终版** archive
+  `880b0fd503abcc04b0d49433c15eeafb`（均 ready）；提交版本 v2（`8636a3d…`）与
+  **v3 最终版**（`b318577fbc02cdfeb8504ac94c707c10`）均 `status=valid`。
+  v3 = 0.3 镜像 + 含 C 题 145 上限的文档；两个版本都未消耗试运行次数。
   首次校验曾返回 `模型服务暂不可用`，退避约 2 分钟后重试成功。
 - **材料**：`reports/技术报告_v2.md`、`reports/来源声明.md`、`docs/演示视频分镜.md`、
   `reports/v2_replay_v1.{md,json}`、`reports/系统说明.md` 已更新
 
 ### 待办（第二次提交）
 
-1. ~~上传 `dist/zhixun-rsi-harness-0.2.tar`~~ ✅（archive `88f5afb…`，ready）
-2. ~~新建提交版本 v2~~ ✅（id `8636a3d…`，`status=valid`）
+1. ~~上传 `dist/zhixun-rsi-harness-0.3.tar`~~ ✅（archive `880b0fd…`，ready）
+2. ~~新建提交版本~~ ✅（v2 `8636a3d…` 中间版；**v3 `b318577…` 最终版**，均 valid）
 3. **选 1 次试运行**（trial 已用 1/10；上传/建版本/校验都不扣次数）→ 看 A/B/C 的
    `decision`、C 是否停止白训、模型裁决是否仍有文本
 4. 录演示视频（按 `docs/演示视频分镜.md`，≤5 分钟）
@@ -46,8 +47,8 @@
 
 ### 新增问题 / 事实修正
 
-- **Q21**：C 的 NASA 分数在 v1 报告中为 8.85e10，指数惩罚对严重低估极敏感；
-  下一轮需单独分析预测分布，不能当作“改进了 NASA”。
+- **Q21**：C 的 NASA 分数在 v1 报告中为 8.85e10，指数惩罚对严重高估极敏感；
+  v2 已对 24 特征回归输出加 145 上限，效果待下一次试运行验证。
 - **Q22**：v2 首次校验返回 `模型服务暂不可用，请稍后重试`；退避约 2 分钟后重试成功，
   状态变 `valid`。短时间重复请求会 409 `校验请求过于频繁`，不要连续点。
 - 平台 `formal_limit=3`（`formal_remaining=3`），不是交接单里写的 2；试运行 `trial_used=1`。

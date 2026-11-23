@@ -1,4 +1,4 @@
-# 智训引擎 · 工业制造场景下的模型训练与超参数优化
+﻿# 智训引擎 · 工业制造场景下的模型训练与超参数优化
 
 > 第二届北京市大学生"人工智能+"创新大赛 · 赛题 9
 > 工作区根目录：`D:\Alice_AI\rsi`
@@ -130,7 +130,7 @@ docker run --rm --network none zhixun-rsi:0.1
 
 # 8) v2 平台入口彩排（假宿主，不消耗平台次数）
 python scripts/test_harness_local.py --dataset A --rounds 10 --grow
-python scripts/test_harness_local.py --dataset A --rounds 3 --docker --image zhixun-rsi-harness:0.2
+python scripts/test_harness_local.py --dataset A --rounds 3 --docker --image zhixun-rsi-harness:0.3
 python scripts/replay_trial.py            # v1 报告 -> v2 预算回放
 ```
 
@@ -144,8 +144,8 @@ python scripts/replay_trial.py            # v1 报告 -> v2 预算回放
 
 **交付链现状**：受控五件套 5/5（`scripts/check_guard.py` 全 PASS）；
 离线镜像 `zhixun-rsi:0.1` 已构建，`docker run --network none` 断网跑通、exit 0。
-**v2 提交镜像** `zhixun-rsi-harness:0.2` 已构建（285 MB，tar 64 MB），
-`docker run --rm --network none zhixun-rsi-harness:0.2 describe` 通过；
+**v2 提交镜像** `zhixun-rsi-harness:0.3` 已构建（285 MB，tar 64 MB），
+`docker run --rm --network none zhixun-rsi-harness:0.3 describe` 通过；
 v1 平台试运行报告见 `docs/status.md` / `reports/技术报告_v2.md`。
 
 > SwanLab 当前默认 `auto`：没登录时写本地 `swanlog/`（不阻塞），登录后自动上传团队空间。

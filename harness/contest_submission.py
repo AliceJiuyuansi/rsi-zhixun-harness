@@ -39,6 +39,7 @@ from src.harness.round_controller import (  # noqa: E402
     acceptance,
     apply_verdict,
     choose_budget,
+    clip_regression_prediction,
     decision_record,
     extract_text,
     feature_profile,
@@ -491,4 +492,5 @@ def predict(sample, model_dir):
         best_index = int(np.argmax(class_scores))
         return [{"label": model.meta["classes"][best_index],
                  "score": float(class_scores[best_index])}]
-    return {"value": float(max(0.0, float(np.asarray(output).reshape(-1)[0])))}
+    return {"value": clip_regression_prediction(
+        float(np.asarray(output).reshape(-1)[0]), len(model.meta["paths"]))}

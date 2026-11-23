@@ -18,6 +18,7 @@ from src.harness.round_controller import (  # noqa: E402
     acceptance,
     apply_verdict,
     choose_budget,
+    clip_regression_prediction,
     extract_text,
     feature_profile,
     js_divergence,
@@ -180,8 +181,14 @@ class AcceptanceTests(unittest.TestCase):
         self.assertTrue(out["promote"])
         self.assertAlmostEqual(out["gain"], 0.10)
         worse = acceptance({"rmse": 100.0}, {"rmse": 100.1}, "regression")
-        self.assertTrue(worse["accepted"])       # within 0.2% noise
+        self.assertFalse(worse["accepted"])      # "not worse" is strict
         self.assertFalse(worse["promote"])
+
+    def test_c_task_prediction_is_capped(self):
+        self.assertEqual(clip_regression_prediction(300.0, 24), 145.0)
+        self.assertEqual(clip_regression_prediction(120.0, 24), 120.0)
+        self.assertEqual(clip_regression_prediction(300.0, 34), 300.0)
+        self.assertEqual(clip_regression_prediction(-5.0, 34), 0.0)
 
     def test_metric_and_gap(self):
         name, value, higher = metric_value("regression", {"rmse": 50.0})
