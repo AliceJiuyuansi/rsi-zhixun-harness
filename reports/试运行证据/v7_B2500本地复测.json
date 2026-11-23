@@ -1,0 +1,28 @@
+{
+  "source_commit": "cbfa9cdb9933309815cc270bee8323bba9177ec0",
+  "environment": "contest-harness 1.0.4, public data, local host, empty model verdict",
+  "variant": {
+    "A": "v6 unchanged",
+    "B": "upper limit 2500 minutes in validation and serving",
+    "C": "v5 operating-condition residual limited to +/-10 cycles; no prediction upper limit"
+  },
+  "datasets": {
+    "B": {
+      "rows": 1679,
+      "rmse": 649.6351950101174,
+      "rounds": 10,
+      "checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78",
+      "validation_sha256": "23673a66bc22a166bf2f47b18f9c9d594f7e66a9aad88ddbccbcaea2310d9eb3",
+      "final_public_predictions_above_cap": 0,
+      "reference_uncapped_v7_checkpoint_identical": true
+    },
+    "C": {
+      "rows": 23049,
+      "rmse": 50.049433683174435,
+      "rounds": 3,
+      "checkpoint_sha256": "7b2648755d7dafa04f242ee2d4550d081b30f05cd45ff55222c7a31a940ae012",
+      "validation_sha256": "0cc747f9998c5d7ee1e4eac6aec0db9f5ed4d2de149a1b1cbe689cce6b6aaca7",
+      "max_difference_vs_v5_public_reference": 1.000444171950221e-11
+    }
+  }
+}
