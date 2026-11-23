@@ -4,9 +4,17 @@
 # 三合一入口 describe / train / predict，靠 SDK 与宿主通信。
 # 平台调用方式：`python3 /app/harness.py describe|train|predict`
 #
-#   docker build -f harness.Dockerfile -t zhixun-rsi-harness:0.1 .
-#   docker run --rm --network none zhixun-rsi-harness:0.1 describe
+# v0.2（2026-11-23）：platform entry now uses the v2 round controller
+# (cross-round drift reference, history read-back, model verdict, stall rule,
+#  and the Gatekeeper's whitelist/budget/bounds/kill-switch).
+#
+#   docker build -f harness.Dockerfile -t zhixun-rsi-harness:0.2 .
+#   docker run --rm --network none zhixun-rsi-harness:0.2 describe
 FROM python:3.11-slim
+
+LABEL org.opencontainers.image.title="zhixun-rsi-harness" \
+      org.opencontainers.image.version="0.2" \
+      org.opencontainers.image.description="Contest 9 harness: offline continuation + drift-gated updates"
 
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 

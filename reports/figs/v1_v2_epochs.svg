@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" width="760" height="360">
+<rect x="0" y="0" width="760" height="360" fill="#ffffff"/>
+<line x1="70" y1="300.0" x2="730" y2="300.0" stroke="#e6e6e6" stroke-width="1"/>
+<text x="60" y="304.0" text-anchor="end" font-family="Arial" font-size="11" fill="#666">0</text>
+<line x1="70" y1="248.0" x2="730" y2="248.0" stroke="#e6e6e6" stroke-width="1"/>
+<text x="60" y="252.0" text-anchor="end" font-family="Arial" font-size="11" fill="#666">11.5</text>
+<line x1="70" y1="196.0" x2="730" y2="196.0" stroke="#e6e6e6" stroke-width="1"/>
+<text x="60" y="200.0" text-anchor="end" font-family="Arial" font-size="11" fill="#666">23</text>
+<line x1="70" y1="144.0" x2="730" y2="144.0" stroke="#e6e6e6" stroke-width="1"/>
+<text x="60" y="148.0" text-anchor="end" font-family="Arial" font-size="11" fill="#666">34.5</text>
+<line x1="70" y1="92.0" x2="730" y2="92.0" stroke="#e6e6e6" stroke-width="1"/>
+<text x="60" y="96.0" text-anchor="end" font-family="Arial" font-size="11" fill="#666">46</text>
+<line x1="70" y1="40.0" x2="730" y2="40.0" stroke="#e6e6e6" stroke-width="1"/>
+<text x="60" y="44.0" text-anchor="end" font-family="Arial" font-size="11" fill="#666">57.5</text>
+<line x1="70" y1="40" x2="70" y2="300" stroke="#888" stroke-width="1"/>
+<line x1="70" y1="300" x2="730" y2="300" stroke="#888" stroke-width="1"/>
+<text x="18" y="180.0" transform="rotate(-90 18 180.0)" text-anchor="middle" font-family="Arial" font-size="12" fill="#444">epochs per dataset (A/B/C)</text>
+<rect x="127.2" y="173.4" width="52.8" height="126.6" fill="#9aa5b1" rx="2"/>
+<text x="153.6" y="168.4" text-anchor="middle" font-family="Arial" font-size="10" fill="#333">28</text>
+<rect x="180.0" y="173.4" width="52.8" height="126.6" fill="#2f6fdb" rx="2"/>
+<text x="206.4" y="168.4" text-anchor="middle" font-family="Arial" font-size="10" fill="#333">28</text>
+<text x="180.0" y="320" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">A</text>
+<rect x="347.2" y="73.9" width="52.8" height="226.1" fill="#9aa5b1" rx="2"/>
+<text x="373.6" y="68.9" text-anchor="middle" font-family="Arial" font-size="10" fill="#333">50</text>
+<rect x="400.0" y="223.1" width="52.8" height="76.9" fill="#2f6fdb" rx="2"/>
+<text x="426.4" y="218.1" text-anchor="middle" font-family="Arial" font-size="10" fill="#333">17</text>
+<text x="400.0" y="320" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">B</text>
+<rect x="567.2" y="114.6" width="52.8" height="185.4" fill="#9aa5b1" rx="2"/>
+<text x="593.6" y="109.6" text-anchor="middle" font-family="Arial" font-size="10" fill="#333">41</text>
+<rect x="620.0" y="218.6" width="52.8" height="81.4" fill="#2f6fdb" rx="2"/>
+<text x="646.4" y="213.6" text-anchor="middle" font-family="Arial" font-size="10" fill="#333">18</text>
+<text x="620.0" y="320" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">C</text>
+<text x="70" y="22" font-family="Arial" font-size="15" fill="#222">Training budget: v1 vs v2 replay</text>
+<rect x="580" y="12" width="12" height="12" fill="#9aa5b1" rx="2"/>
+<text x="596" y="23" font-family="Arial" font-size="12" fill="#333">v1</text>
+<rect x="660" y="12" width="12" height="12" fill="#2f6fdb" rx="2"/>
+<text x="676" y="23" font-family="Arial" font-size="12" fill="#333">v2</text>
+</svg>

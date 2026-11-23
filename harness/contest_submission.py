@@ -1,17 +1,22 @@
-"""Contest harness entry: one round = read parent -> continue -> submit -> finish.
+"""Contest harness entry: one round = read history -> measure -> decide -> act.
 
 Platform contract (SDK 1.0.4, protocol `contest.harness.workspace.v2`):
 
     train(rnd)    called once per round
     predict(sample, model_dir)   called later, one sample per stdin line
 
+The v2 controller lives in `src/harness/round_controller.py`; this file is the
+thin I/O shell: read the mount, call the model, pass the action through the
+Gatekeeper, continue the parent checkpoint, and finish.
+
 Ordering rules that are easy to get wrong:
   1. training data only comes from the platform mount (/data) - nothing local;
   2. the model must be the parent checkpoint *continued* (weights + Adam + scalers);
   3. every round needs at least one real model call, or `finish` is rejected;
-  4. any failure degrades to "keep the parent model" and still finishes the round.
+  4. any failure degrades to "keep the parent model" and still finishes the round;
+  5. state saved this round is what the next round sees - keep it small and honest.
 
-Naming: variables are spelled out (`previous_run`, `candidate_dir`,
+Naming: variables are spelled out (`previous_state`, `candidate_dir`,
 `round_result`) because this file is read more often than it is written.
 """
 from __future__ import annotations
@@ -29,24 +34,37 @@ PLATFORM_APP_DIR = Path(os.environ.get("CONTEST_APP", "/app"))
 if str(PLATFORM_APP_DIR) not in sys.path:
     sys.path.insert(0, str(PLATFORM_APP_DIR))
 
+from src.harness.guard import Gatekeeper  # noqa: E402
+from src.harness.round_controller import (  # noqa: E402
+    acceptance,
+    apply_verdict,
+    choose_budget,
+    decision_record,
+    extract_text,
+    feature_profile,
+    js_divergence,
+    metric_value,
+    parse_verdict,
+    prediction_profile,
+    psi_against,
+    score_gap,
+    summarise_history,
+)
 from src.models.official_round import OfficialRound  # noqa: E402
-from src.policy.strategy import Signal, choose, diagnose, explain  # noqa: E402
+from src.policy.whitelist import NONE_ACTION  # noqa: E402
+from src.schema import Action, GateDecision  # noqa: E402
+from src.utils.audit import AuditLog  # noqa: E402
 from vendor.contest_baselines.data import flatten, read_dataset  # noqa: E402
 from vendor.contest_baselines.model import Model  # noqa: E402
 
 SUPPORTED_TASKS = ("classification", "regression")
 HARNESS_ENTRY = os.environ.get("CONTEST_HARNESS", str(PLATFORM_APP_DIR / "harness.py"))
 PREDICT_COMMAND = [sys.executable, HARNESS_ENTRY, "predict"]
-
-# A candidate is only accepted when it is at least this close to the parent.
-ACCEPT_MARGIN = 0.02
-FIRST_ROUND_NEW_EPOCHS = 5      # round 1: make a real attempt on the shipped baseline
-FIRST_ROUND_NEW_LEARNING_RATE = 2e-3
-FRESH_DATA_EPOCHS = 3           # later rounds, when the platform reveals new data
-FRESH_DATA_LEARNING_RATE = 1.5e-3
-QUIET_ROUND_EPOCHS = 1          # drift quiet: barely touch the weights
-QUIET_ROUND_LEARNING_RATE = 1e-3
-EARLY_STOP_PATIENCE = 2         # stop after 2 epochs with no new best validation score
+WORKSPACE = Path(os.environ.get("CONTEST_WORK", "/workspace"))
+STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
+EARLY_STOP_PATIENCE = 2
+MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
+STATE_SCHEMA = 2
 
 
 def log_to_stderr(message: str) -> None:
@@ -54,84 +72,28 @@ def log_to_stderr(message: str) -> None:
     print(f"[submission] {message}", file=sys.stderr, flush=True)
 
 
+def truncate_utf8(text: str, limit: int = 3900) -> str:
+    """Keep the protocol's 4000-*byte* limit even for Chinese text."""
+    raw = (text or "").encode("utf-8")
+    if len(raw) <= limit:
+        return text or ""
+    return raw[:limit].decode("utf-8", "ignore")
+
+
 def read_previous_state() -> dict:
     """Native state saved by the previous round (/state is read-only)."""
-    try:
-        return json.loads((Path("/state") / "harness_state.json").read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-
-def feature_drift_psi(reference_rows: np.ndarray, current_rows: np.ndarray, bins: int = 10) -> float:
-    """Largest PSI across features: how far the current inputs moved from the reference.
-
-    PSI < 0.10 stable, 0.10-0.25 mild, > 0.25 clear drift (industry rule of thumb).
-    """
-    reference_rows = np.asarray(reference_rows, dtype=float)
-    current_rows = np.asarray(current_rows, dtype=float)
-    if len(reference_rows) < 10 or len(current_rows) < 10:
-        return 0.0
-    per_feature_scores = []
-    for column in range(reference_rows.shape[1]):
-        bin_edges = np.unique(np.quantile(reference_rows[:, column], np.linspace(0, 1, bins + 1)))
-        if bin_edges.size < 3:
+    for name in ("harness_state.json", "state.json"):
+        try:
+            payload = json.loads((STATE_DIR / name).read_text(encoding="utf-8"))
+        except Exception:
             continue
-        reference_share = np.histogram(reference_rows[:, column], bins=bin_edges)[0].astype(float)
-        current_share = np.histogram(current_rows[:, column], bins=bin_edges)[0].astype(float)
-        reference_share = np.clip(reference_share / max(reference_share.sum(), 1), 1e-6, None)
-        current_share = np.clip(current_share / max(current_share.sum(), 1), 1e-6, None)
-        reference_share /= reference_share.sum()
-        current_share /= current_share.sum()
-        per_feature_scores.append(
-            float(np.sum((current_share - reference_share) * np.log(current_share / reference_share))))
-    return float(max(per_feature_scores)) if per_feature_scores else 0.0
-
-
-def decide_training_budget(round_index: int, previous_run: dict, training_rows: int,
-                           drift_psi: float) -> tuple[dict, str]:
-    """How many epochs at what learning rate this round, plus the reason.
-
-    Three cases, cheapest first:
-      - kill-switch latched     -> do not touch the model
-      - round 1                 -> a real attempt, so later rounds start from something
-      - new public data arrived -> spend more (the platform revealed a new stage)
-      - otherwise               -> drift-band table decides
-    """
-    if previous_run.get("kill_switch"):
-        return {"epochs": 0}, "kill-switch was latched by an earlier round"
-
-    if round_index <= 1:
-        return ({"epochs": FIRST_ROUND_NEW_EPOCHS, "lr": FIRST_ROUND_NEW_LEARNING_RATE},
-                "round 1: continue the shipped baseline with a real training attempt")
-
-    best_validation_score = float(previous_run.get("best_val", 0.0))
-    last_validation_score = float(previous_run.get("val", best_validation_score or 0.0))
-    score_gap = max(best_validation_score - last_validation_score, 0.0)
-    data_grew = training_rows > int(previous_run.get("n_train", 0))
-
-    action = choose(Signal(psi=drift_psi, gap=score_gap,
-                           retrains=int(previous_run.get("updates", 0))))
-    if action.kind == "none":
-        epochs = FRESH_DATA_EPOCHS if data_grew else QUIET_ROUND_EPOCHS
-        rate = FRESH_DATA_LEARNING_RATE if data_grew else QUIET_ROUND_LEARNING_RATE
-        return ({"epochs": epochs, "lr": rate},
-                "no action needed ("
-                + explain(action, Signal(psi=drift_psi, gap=score_gap))
-                + "); cheap calibration only")
-
-    epochs = int(action.params.get("epochs", FRESH_DATA_EPOCHS))
-    rate = float(action.params.get("lr", FRESH_DATA_LEARNING_RATE))
-    return ({"epochs": epochs, "lr": rate},
-            explain(action, Signal(psi=drift_psi, gap=score_gap)))
+        if isinstance(payload, dict):
+            return payload
+    return {}
 
 
 def find_parent_checkpoint(rnd, root=None) -> Path:
-    """Locate the parent checkpoint without assuming its exact file name.
-
-    The platform declares `checkpoint_paths` in the parent artifact; today it is
-    `checkpoint.npz`, but hard-coding that would break the moment the organiser
-    nests it (`baseline/checkpoint.npz`). We therefore look at what was declared.
-    """
+    """Locate the parent checkpoint without assuming its exact file name."""
     declared_paths = list(rnd.parent.declared_paths())
     numpy_files = [path for path in declared_paths if path.endswith(".npz")]
     preferred = [path for path in numpy_files if path.endswith("checkpoint.npz")]
@@ -141,12 +103,51 @@ def find_parent_checkpoint(rnd, root=None) -> Path:
     return rnd.parent.path(candidates[0], root=root)
 
 
+def _metric_state(previous: dict, before: dict, task: str) -> dict:
+    """Best/last values in native units, plus the gap the policy reacts to."""
+    name, value, higher = metric_value(task, before)
+    if previous:
+        best = float(previous.get("best", value))
+        last = float(value)
+        best = max(best, last) if higher else min(best, last)
+        baseline = float(previous.get("baseline", best))
+    else:
+        best = last = baseline = float(value)
+    return {
+        "metric": name,
+        "higher_is_better": higher,
+        "before": float(value),
+        "best": float(best),
+        "last": float(last),
+        "baseline": float(baseline),
+        "gap": score_gap(best, last, higher),
+    }
+
+
+def _model_prompt(payload: dict) -> str:
+    return (
+        "你是工业模型自进化系统的决策器。下面是一轮的真实状态（JSON）。\n"
+        "请只输出一行 JSON，不要解释，不要 Markdown：\n"
+        '{"decision":"train|hold","epochs":0-3,"lr":0.0005-0.003,"reason":"不超过60字"}\n'
+        "规则：新阶段数据到达且有漂移时可 train；连续多轮无收益、或没有新数据且指标稳定时 hold；"
+        "绝不建议超过规则预算的 epochs。\n"
+        "状态：\n" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    )
+
+
 def train(rnd) -> None:
     round_started_at = time.time()
     task_contract = rnd.task or {}
     task = task_contract.get("task", "classification")
     if task not in SUPPORTED_TASKS:
         raise ValueError(f"unsupported task {task!r}")
+
+    WORKSPACE.mkdir(parents=True, exist_ok=True)
+    audit = AuditLog(WORKSPACE / f"audit-round-{rnd.round_index}.jsonl",
+                     run=f"{rnd.dataset_key}-r{rnd.round_index}")
+    previous_state = read_previous_state()
+    platform_history = rnd.history()          # RPC: records of completed rounds
+    history = summarise_history(platform_history, previous_state, task)
 
     # --- 1. the parent model (always a declared file, never /app) ---------
     parent_root_override = os.environ.get("CONTEST_PARENT_ROOT") or None  # local rehearsal only
@@ -160,83 +161,156 @@ def train(rnd) -> None:
                                     expected_paths=feature_paths)
     validation_dataset = read_dataset(rnd.data.validation_path, task, class_names or None,
                                       expected_paths=feature_paths)
-    drift_psi = feature_drift_psi(training_dataset["x"], validation_dataset["x"])
-    previous_run = read_previous_state()
+    train_rows = int(len(training_dataset["ids"]))
+    validation_rows = int(len(validation_dataset["ids"]))
 
     trainer = OfficialRound()
     validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
                                          validation_dataset["y"])
-    budget, budget_reason = decide_training_budget(
-        rnd.round_index, previous_run, len(training_dataset["ids"]), drift_psi)
-    log_to_stderr(
-        f"round {rnd.round_index}: rows={len(training_dataset['ids'])} psi={drift_psi:.3f} "
-        f"before={validation_before} budget={budget} why={budget_reason}")
+    metric_state = _metric_state(previous_state, validation_before, task)
 
-    # --- 3. the model call the platform requires (never skipped) ----------
-    state_summary = json.dumps({
-        "dataset": rnd.dataset_key,
-        "round": rnd.round_index,
-        "rows": {"train": len(training_dataset["ids"]),
-                 "validation": len(validation_dataset["ids"])},
-        "previous_best": previous_run.get("best_val"),
-        "validation_before": validation_before,
-        "drift": {"psi_max": round(drift_psi, 4),
-                  "diagnosis": diagnose(Signal(psi=drift_psi, gap=0.0))},
-        "proposed_budget": budget,
-    }, ensure_ascii=False)
+    # --- 3. drift: against last stage, against round 1, and train vs val --
+    previous_profile = previous_state.get("profile")
+    baseline_profile = previous_state.get("baseline_profile") or previous_profile
+    current_profile = feature_profile(training_dataset["x"])
+    psi_prev = psi_against(previous_profile, training_dataset["x"])
+    psi_baseline = psi_against(baseline_profile, training_dataset["x"])
+    psi_holdout = psi_against(current_profile, validation_dataset["x"])
+
+    previous_predictions = parent_model.predict(validation_dataset["x"])
+    prediction_now = prediction_profile(
+        previous_predictions, task, class_names,
+        reference_edges=(previous_state.get("pred_profile") or {}).get("edges"))
+    previous_pred_shares = (previous_state.get("pred_profile") or {}).get("shares")
+    pred_js = js_divergence(previous_pred_shares, prediction_now.get("shares")
+                            if isinstance(prediction_now, dict) else None)
+
+    stage_id = str(getattr(rnd, "stage_id", "") or "")
+    stage_changed = bool(stage_id) and stage_id != str(previous_state.get("stage_id", ""))
+    if stage_changed:
+        # Validation distributions differ across stages; an all-time best from
+        # the previous stage is not comparable. Start the new stage's record at
+        # the current parent, otherwise "best - current" looks like damage that
+        # was never observed within this stage.
+        metric_state["best"] = metric_state["before"]
+        metric_state["gap"] = 0.0
+    data_grew = train_rows > int(previous_state.get("n_train", 0))
+    history["kill_switch"] = bool(previous_state.get("kill_switch"))
+
+    # --- 4. rule budget, then let the model narrow it ---------------------
+    budget = choose_budget(
+        dataset_key=str(rnd.dataset_key), task=task, round_index=int(rnd.round_index),
+        psi_prev=psi_prev, psi_holdout=max(psi_holdout, psi_baseline if not previous_state else 0.0),
+        data_grew=data_grew, stage_changed=stage_changed, gap=metric_state["gap"],
+        history=history)
+    model_state = {
+        "round": rnd.round_index, "stage": stage_id, "dataset": rnd.dataset_key,
+        "task": task, "metric": metric_state["metric"],
+        "parent": round(metric_state["before"], 6),
+        "best": round(metric_state["best"], 6),
+        "gap": round(metric_state["gap"], 6),
+        "rows": {"train": train_rows, "validation": validation_rows,
+                 "train_grew": data_grew, "stage_changed": stage_changed},
+        "drift": {"psi_vs_previous": round(psi_prev, 4),
+                  "psi_vs_baseline": round(psi_baseline, 4),
+                  "psi_train_vs_validation": round(psi_holdout, 4),
+                  "prediction_js": round(pred_js, 4)},
+        "history": history["recent"],
+        "history_evidence": history["evidence"],
+        "last_gain": history["last_gain"], "stalled": history["stalled"],
+        "rule_budget": budget,
+    }
     model_receipt = rnd.model(
-        [{"role": "user",
-          "content": "工业模型本轮状态如下（JSON）。请用一句话判断：继续训练、保持父模型，还是回滚。\n"
-                     + state_summary}],
+        [{"role": "user", "content": _model_prompt(model_state)}],
         max_tokens=min(256, rnd.max_output_tokens), temperature=0)
-    model_verdict = (model_receipt.text or "").strip()[:400]
-    log_to_stderr(f"model call {model_receipt.call_id}: {model_verdict[:120]}")
+    model_text = extract_text(model_receipt.response)
+    verdict = parse_verdict(model_text)
+    decision = apply_verdict(budget, verdict, history, int(rnd.round_index))
+    log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
+                  f"stage_changed={stage_changed} rule={budget['rule']} "
+                  f"model={decision.get('model_action')} budget={decision['epochs']}ep")
 
-    # --- 4. continue the parent, then decide whether to submit -----------
-    workspace_dir = Path(os.environ.get("CONTEST_WORK", "/workspace"))
-    candidate_dir = workspace_dir / f"candidate-round-{rnd.round_index}"
-    shutil.rmtree(candidate_dir, ignore_errors=True)  # continue_round creates it itself
+    # --- 5. controlled execution: kill-switch / whitelist / budget / bounds
+    gate = Gatekeeper(
+        cfg={"policy": {"max_retrains": MAX_UPDATES, "max_retrains_per_window": 0,
+                        "amplitude_factor": 2.0, "max_consecutive_failures": 3}},
+        audit=audit, root=WORKSPACE, executable=("none", "finetune"))
+    gate.limiter.last = dict(previous_state.get("bounds") or {})
+    gate.budget.steps = [int(item) for item in (previous_state.get("budget_steps") or [])
+                         if isinstance(item, (int, float))]
+    if decision["epochs"] > 0:
+        proposed = Action("finetune", {"epochs": int(decision["epochs"]),
+                                       "lr": round(float(decision["lr"]), 6)},
+                          est_cost=float(decision["epochs"]), est_gain=float(history["last_gain"]))
+    else:
+        proposed = NONE_ACTION
+    gated = gate.review(GateDecision(True, decision["reason"], proposed),
+                        step=int(rnd.round_index), retrains=int(previous_state.get("updates", 0)))
+    if not gated.approved:
+        log_to_stderr(f"gate rejected: {gated.reason}; keeping parent")
+        decision.update(action="none", epochs=0, lr=0.0, rule="gate_reject",
+                        reason=f"闸门拒绝：{gated.reason}；保持父模型")
+    elif decision["epochs"] > 0:
+        # the amplitude limiter may clip params; never let it *increase* epochs
+        gated_epochs = int(gated.action.params.get("epochs", decision["epochs"]))
+        decision["epochs"] = max(1, min(int(decision["epochs"]), gated_epochs))
+        decision["lr"] = float(gated.action.params.get("lr", decision["lr"]))
 
+    # --- 6. continue the parent, then decide whether to submit -----------
+    candidate_dir = WORKSPACE / f"candidate-round-{rnd.round_index}"
+    shutil.rmtree(candidate_dir, ignore_errors=True)
     round_result = None
     training_error = ""
-    candidate_is_better = False
-    try:
-        if int(budget.get("epochs", 0)) > 0:
+    outcome = None
+    if int(decision["epochs"]) > 0:
+        try:
             round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
                 validation_dataset["x"], validation_dataset["y"],
                 out_dir=candidate_dir,
-                epochs=int(budget["epochs"]),
-                learning_rate=float(budget.get("lr", FRESH_DATA_LEARNING_RATE)),
+                epochs=int(decision["epochs"]),
+                learning_rate=float(decision["lr"]),
                 patience=EARLY_STOP_PATIENCE,
-                stage_id=f"round-{rnd.round_index}",
-                hypothesis=budget_reason,
-                change_summary=json.dumps(budget, ensure_ascii=False))
-            score_before = _primary_score(round_result.metrics_before)
-            score_after = _primary_score(round_result.metrics_after)
-            candidate_is_better = score_after >= score_before - ACCEPT_MARGIN
-        else:
-            training_error = "no training this round (kill-switch or do-nothing decision)"
-    except Exception as exc:  # noqa: BLE001 - degradation is part of the contract
-        training_error = f"{type(exc).__name__}: {exc}"
-        log_to_stderr(f"training failed, keeping the parent model: {training_error}")
-        shutil.rmtree(candidate_dir, ignore_errors=True)
+                stage_id=stage_id or f"round-{rnd.round_index}",
+                hypothesis=decision["reason"],
+                change_summary=json.dumps({"rule": decision["rule"],
+                                           "signals": decision["signals"]},
+                                          ensure_ascii=False))
+            outcome = acceptance(round_result.metrics_before, round_result.metrics_after, task)
+            gate.commit(gated.action, step=int(rnd.round_index))
+            audit.write("round_result", step=int(rnd.round_index), rule=decision["rule"],
+                        epochs=decision["epochs"], outcome=outcome,
+                        metrics_after=round_result.metrics_after)
+        except Exception as exc:  # noqa: BLE001 - degradation is part of the contract
+            training_error = f"{type(exc).__name__}: {exc}"
+            log_to_stderr(f"training failed, keeping the parent model: {training_error}")
+            shutil.rmtree(candidate_dir, ignore_errors=True)
+            outcome = None
+    else:
+        training_error = "no training this round (policy or gate chose none)"
 
     selected_artifact_id = rnd.parent.artifact_id
-    if round_result is not None and candidate_is_better:
+    promoted = bool(outcome and outcome.get("promote"))
+    if promoted and round_result is not None:
         code_snapshot_dir = candidate_dir / "code"
         code_snapshot_dir.mkdir(exist_ok=True)
-        for source_file in (Path(__file__), PLATFORM_APP_DIR / "src/policy/strategy.py"):
+        for source_file in (Path(__file__), PLATFORM_APP_DIR / "src/policy/strategy.py",
+                            PLATFORM_APP_DIR / "src/harness/round_controller.py"):
             if source_file.exists():
                 shutil.copyfile(source_file, code_snapshot_dir / source_file.name)
         candidate_receipt = rnd.submit_candidate(
             candidate_dir,
-            hypothesis=budget_reason[:4000],
-            change_summary=(f"continue {budget['epochs']} epochs at lr={budget.get('lr')} "
-                            f"from parent; before={round_result.metrics_before} "
-                            f"after={round_result.metrics_after}")[:4000],
-            configuration=dict(budget, psi=drift_psi, model_verdict=model_verdict[:200]),
+            hypothesis=truncate_utf8(decision["reason"]),
+            change_summary=(f"{decision['rule']}: epochs={decision['epochs']} lr={decision['lr']} "
+                            f"before={round_result.metrics_before} after={round_result.metrics_after} "
+                            f"gain={outcome['gain']}"),
+            configuration={"rule": decision["rule"], "epochs": int(decision["epochs"]),
+                           "lr": float(decision["lr"]), "psi_prev": round(psi_prev, 4),
+                           "psi_holdout": round(psi_holdout, 4), "pred_js": round(pred_js, 4),
+                           "history": history["recent"], "model_action": decision.get("model_action"),
+                           "gain": outcome["gain"], "accepted": outcome["accepted"],
+                           "promoted": True, "rows": train_rows},
             seed=int(parent_model.meta["seed"]),
             checkpoint_paths=["checkpoint.npz"],
             code_paths=[f"code/{path.name}" for path in code_snapshot_dir.iterdir()],
@@ -244,46 +318,136 @@ def train(rnd) -> None:
         )
         selected_artifact_id = candidate_receipt["artifact_id"]
     elif round_result is not None:
-        log_to_stderr(f"candidate not accepted: before={round_result.metrics_before} "
-                      f"after={round_result.metrics_after}")
+        log_to_stderr(f"candidate kept aside: before={round_result.metrics_before} "
+                      f"after={round_result.metrics_after} outcome={outcome}")
 
-    # --- 5. hand state to the next round, then finish ---------------------
-    next_round_state_dir = workspace_dir / f"state-round-{rnd.round_index}"
-    next_round_state_dir.mkdir(parents=True, exist_ok=True)
-    final_score = _primary_score(round_result.metrics_after if round_result
-                                 else validation_before)
-    (next_round_state_dir / "harness_state.json").write_text(json.dumps({
-        "n_train": len(training_dataset["ids"]),
-        "val": final_score,
-        "best_val": max(float(previous_run.get("best_val", 0.0)), final_score),
-        "updates": int(previous_run.get("updates", 0)) + (1 if round_result else 0),
-        "last_round": rnd.round_index,
-        "clock_seconds": round(float(previous_run.get("clock_seconds", 0.0))
+    # --- 7. hand compact, honest state to the next round ------------------
+    final_metrics = round_result.metrics_after if promoted else validation_before
+    final_metric_state = _metric_state(previous_state, final_metrics, task)
+    if promoted:
+        selected_value = float(metric_value(task, round_result.metrics_after)[1])
+        best_value = (max(metric_state["best"], selected_value) if metric_state["higher_is_better"]
+                      else min(metric_state["best"], selected_value))
+    else:
+        selected_value = metric_state["before"]
+        best_value = metric_state["best"]
+
+    if promoted:
+        stalled = 0
+        last_gain = float(outcome["gain"])
+        last_rejected = False
+        promotions = int(previous_state.get("promotions", 0)) + 1
+    elif int(decision["epochs"]) > 0:
+        stalled = int(history["stalled"]) + 1
+        last_gain = float(outcome["gain"]) if outcome else 0.0
+        last_rejected = bool(outcome and not outcome.get("accepted"))
+        promotions = int(previous_state.get("promotions", 0))
+    else:
+        stalled = int(history["stalled"])
+        last_gain = float(history["last_gain"])
+        last_rejected = bool(history.get("last_rejected", False))
+        promotions = int(previous_state.get("promotions", 0))
+
+    # predictions of whatever model will serve the next round
+    if promoted and round_result is not None:
+        try:
+            next_model = Model.load(str(round_result.checkpoint))
+            next_profile = prediction_profile(
+                next_model.predict(validation_dataset["x"]), task, class_names,
+                reference_edges=(prediction_now or {}).get("edges") if isinstance(prediction_now, dict) else None)
+        except Exception:  # noqa: BLE001
+            next_profile = prediction_now
+    else:
+        next_profile = prediction_now
+    if next_profile:
+        next_profile["round"] = int(rnd.round_index)
+        next_profile["model"] = "candidate" if promoted else "parent"
+
+    record = decision_record(
+        round_index=int(rnd.round_index), stage_id=stage_id, dataset_key=str(rnd.dataset_key),
+        action=decision, history=history,
+        psi={"previous": round(psi_prev, 4), "baseline": round(psi_baseline, 4),
+             "train_vs_validation": round(psi_holdout, 4), "prediction_js": round(pred_js, 4)},
+        model_verdict=model_text, outcome=outcome, accepted=bool(outcome and outcome.get("accepted")),
+        region="gate:" + ("approved" if gated.approved else gated.reason))
+    records = list(previous_state.get("decisions") or [])[-9:] + [record]
+
+    next_state = {
+        "schema": STATE_SCHEMA,
+        "dataset": str(rnd.dataset_key),
+        "task": task,
+        "metric": final_metric_state["metric"],
+        "direction": "higher" if final_metric_state["higher_is_better"] else "lower",
+        "round": int(rnd.round_index),
+        "stage_id": stage_id or str(previous_state.get("stage_id", "")),
+        "n_train": train_rows,
+        "n_validation": validation_rows,
+        "baseline": round(float(previous_state.get("baseline", metric_state["before"])), 6),
+        "best": round(float(best_value), 6),
+        "last": round(float(selected_value), 6),
+        "last_gain": round(float(last_gain), 6),
+        "stalled": int(stalled),
+        "last_rejected": bool(last_rejected),
+        "updates": int(previous_state.get("updates", 0)) + (1 if int(decision["epochs"]) > 0 else 0),
+        "promotions": int(promotions),
+        "profile": current_profile,
+        "baseline_profile": baseline_profile or current_profile,
+        "pred_profile": next_profile or previous_state.get("pred_profile"),
+        "bounds": gate.limiter.as_dict(),
+        "budget_steps": list(gate.budget.steps),
+        "kill_switch": bool(gate.kill.tripped()),
+        "audit": audit.as_dict(),
+        "audit_events": list(audit.events[-20:]),
+        "decisions": records,
+        "clock_seconds": round(float(previous_state.get("clock_seconds", 0.0))
                                + time.time() - round_started_at, 2),
-        "kill_switch": bool(previous_run.get("kill_switch")) or os.environ.get("RSI_STOP", "") == "1",
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    }
+    next_round_state_dir = WORKSPACE / f"state-round-{rnd.round_index}"
+    shutil.rmtree(next_round_state_dir, ignore_errors=True)
+    next_round_state_dir.mkdir(parents=True, exist_ok=True)
+    (next_round_state_dir / "harness_state.json").write_text(
+        json.dumps(next_state, ensure_ascii=False, indent=1, allow_nan=False), encoding="utf-8")
+    (next_round_state_dir / "decisions.jsonl").write_text(
+        "".join(json.dumps(item, ensure_ascii=False, allow_nan=False) + "\n" for item in records),
+        encoding="utf-8")
     rnd.save_state(next_round_state_dir)
 
+    # --- 8. finish with a reason a human can audit -----------------------
+    after_text = (f"{final_metric_state['metric']} {outcome['before']}→{outcome['after']} "
+                  f"gain={outcome['gain']:+.4f}" if outcome else
+                  f"{final_metric_state['metric']} 保持 {metric_state['before']:.4f}")
+    reason = (
+        f"第{rnd.round_index}轮（{stage_id or 'unknown-stage'}）：{decision['reason']}。"
+        f"历史：{history['evidence']}。"
+        f"漂移：PSI(上轮)={psi_prev:.3f} PSI(基线)={psi_baseline:.3f} PSI(训/验)={psi_holdout:.3f} "
+        f"预测JS={pred_js:.3f}。"
+        f"模型裁决：{decision.get('model_action')}"
+        f"（{(decision.get('model_reason') or model_text or '无文本，按规则执行')[:120]}）。"
+        f"结果：{after_text}；{'提交新候选' if promoted else '保持父模型'}"
+        f"{'；训练异常=' + training_error if training_error else ''}。"
+    )
+    log_to_stderr(reason[:600])
     rnd.finish(
         selected_artifact_id=selected_artifact_id,
-        hypothesis=budget_reason[:4000],
-        change_summary=(f"round {rnd.round_index}: {json.dumps(budget, ensure_ascii=False)}; "
-                        f"accepted={candidate_is_better}; error={training_error or 'none'}")[:4000],
-        reason=(model_verdict or "no model text")[:4000],
-        configuration=dict(budget, accepted=candidate_is_better, psi=round(drift_psi, 4)),
+        hypothesis=truncate_utf8(decision["reason"]),
+        change_summary=(f"action={decision['action']} epochs={decision['epochs']} "
+                        f"lr={decision['lr']} rule={decision['rule']} "
+                        f"promoted={promoted} outcome={outcome}"),
+        reason=truncate_utf8(reason),
+        configuration={"rule": decision["rule"], "action": decision["action"],
+                       "epochs": int(decision["epochs"]), "lr": float(decision["lr"]),
+                       "psi_prev": round(psi_prev, 4), "psi_baseline": round(psi_baseline, 4),
+                       "psi_holdout": round(psi_holdout, 4), "pred_js": round(pred_js, 4),
+                       "rows": {"train": train_rows, "validation": validation_rows},
+                       "stage_changed": stage_changed, "data_grew": data_grew,
+                       "history": history["recent"], "model_action": decision.get("model_action"),
+                       "accepted": bool(outcome and outcome.get("accepted")),
+                       "promoted": promoted, "gain": None if not outcome else outcome["gain"],
+                       "gate": gated.approved},
         seed=int(parent_model.meta["seed"]),
-        history_ids=[item.get("id", "") for item in rnd.history()][:50],
+        history_ids=list(rnd.history_ids)[:50],
         model_call_ids=list(rnd.call_ids),
     )
-
-
-def _primary_score(metrics: dict) -> float:
-    """One number to compare rounds: macro-F1 for classification, -RMSE otherwise."""
-    if "macro_f1" in metrics:
-        return float(metrics["macro_f1"])
-    if "rmse" in metrics:
-        return -float(metrics["rmse"])
-    return float(metrics.get("accuracy", 0.0))
 
 
 # --------------------------------------------------------------- predict

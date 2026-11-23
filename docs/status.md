@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-11-23：v1 试运行复盘 + v2 控制器与第二次提交准备
+
+### 完成
+
+- **读回 v1 试运行报告**（`_state/trial_report_completed.json`）：A/B/C 各 10 轮全部 `finish`
+  - A：macro-F1 **0.8735** / accuracy 0.8795，CPU 993 s，wall 2662 s
+  - B：MAE **506.67** 分钟 / RMSE 708.58，CPU 368 s，wall 1968 s
+  - C：MAE **41.12** 循环 / RMSE 56.38，CPU 1868 s，wall 3530 s
+  - 三个待查点：`/data` 按阶段变化（A 8 段 / B 3 段 / C 4 段）、父检查点路径稳定、10 轮都完成
+- **定位 v1 四个缺陷**：回归 `best_val` 初值 0；Qwen 回复在 `reasoning_content` 而只读 `content`；
+  C 第 4–10 轮 / B 第 3–10 轮候选被拒仍重训；漂移参考不跨轮、预测 JS 恒 0
+- **v2 轮次控制器** `src/harness/round_controller.py`：跨轮参考画像、历史回读、模型裁决可读/可收窄、
+  相对 gap、停手/探针、相对验收阈值；`harness/contest_submission.py` 接入 Gatekeeper 五件套
+- **状态 schema 2**：`profile/baseline_profile/pred_profile`、`best/last/last_gain/stalled`、
+  `decisions[≤10]`、`bounds/budget_steps/audit_events`
+- **测试**：`tests/test_round_controller.py` 23 项全 PASS
+- **彩排**：进程内 A 10 轮、B 3 轮、C 3 轮（含回归路径）、C 全量首轮 45k 行
+  （RMSE 52.87→52.00，+1.65%，采纳）；容器内 `--network none` A 3 轮全 exit 0
+- **回放**：v1 报告 119 epoch → v2 63 epoch（-47%），估计少 1291 CPU 秒（-40%）；
+  A 不省（更新都有收益），B/C 主要省在“被拒还重训”的轮次
+- **v2 镜像**：`zhixun-rsi-harness:0.2`（285 MB，tar 64 MB）已构建、断网 describe 通过；
+  `dist/zhixun-rsi-harness-0.2.tar` 已导出
+- **平台动作**：v2 镜像已上传（archive `88f5afb49c48e28be5101f145b1ed89f`，ready）；
+  提交版本 **v2 已创建并通过校验**（id `8636a3dcbc7536fb7a80d608f96c76f7`，
+  `Qwen/Qwen3.5-4B`，文档 `系统说明.md`，源码/训练记录同 v1，`status=valid`）。
+  首次校验曾返回 `模型服务暂不可用`，退避约 2 分钟后重试成功。
+- **材料**：`reports/技术报告_v2.md`、`reports/来源声明.md`、`docs/演示视频分镜.md`、
+  `reports/v2_replay_v1.{md,json}`、`reports/系统说明.md` 已更新
+
+### 待办（第二次提交）
+
+1. ~~上传 `dist/zhixun-rsi-harness-0.2.tar`~~ ✅（archive `88f5afb…`，ready）
+2. ~~新建提交版本 v2~~ ✅（id `8636a3d…`，`status=valid`）
+3. **选 1 次试运行**（trial 已用 1/10；上传/建版本/校验都不扣次数）→ 看 A/B/C 的
+   `decision`、C 是否停止白训、模型裁决是否仍有文本
+4. 录演示视频（按 `docs/演示视频分镜.md`，≤5 分钟）
+5. 确认试运行报告后再决定「选为正式版本 + 开始正式评测」
+   （平台 `#teams` 显示 `formal_limit=3`，与交接单写的 2 次不一致，以平台为准）
+
+### 新增问题 / 事实修正
+
+- **Q21**：C 的 NASA 分数在 v1 报告中为 8.85e10，指数惩罚对严重低估极敏感；
+  下一轮需单独分析预测分布，不能当作“改进了 NASA”。
+- **Q22**：v2 首次校验返回 `模型服务暂不可用，请稍后重试`；退避约 2 分钟后重试成功，
+  状态变 `valid`。短时间重复请求会 409 `校验请求过于频繁`，不要连续点。
+- 平台 `formal_limit=3`（`formal_remaining=3`），不是交接单里写的 2；试运行 `trial_used=1`。
+- 第一次试运行（`41d6c1d6…`）平台侧失败，同版本重跑后完成；失败不占次数。
+
+### 下一步
+
+- v2 平台试运行 1 次 → 按报告决定是否调 C 预算 → 正式评测。
+- 若模型仍无文本：保持“规则执行 + `model_action=unavailable`”的诚实记录，不伪造裁决。
+
+### 阻塞
+
+- 上传/试运行/正式评测需要人工确认；无技术阻塞。
+
+---
+
 ## 2026-11-20（第五段）：平台提交完成，首次试运行已排队
 
 ### 完成
@@ -282,3 +341,7 @@
 | 2026-11-20 | 未实现的动作（finetune/swap_model/reweight）在白名单里"声明但不放行" | 防止 LLM 提名后被静默当 retrain 执行；没有执行器就不许选 | `src/harness/guard.py`、F1 |
 | 2026-11-20 | 镜像不装 swanlab，入口固定 `RSI_SWAN_MODE=disabled` | 断网是硬约束，装了也连不上，反而制造出网尝试；云端记录由宿主机跑的实验负责 | `Dockerfile`、`scripts/entrypoint.py` |
 | 2026-11-20 | 镜像把 36 维特征缓存烤进去（1.3 MB），不要求挂盘 | 评测机挂载方式未知（Q8 未确认），自包含最稳；原始 16 GB 数据集不进镜像 | `Dockerfile`、`.dockerignore` |
+| 2026-11-23 | v2 把“连续 2 轮无收益就停手”放在重训之前 | v1 报告显示 C 第 4–10 轮、B 第 3–10 轮候选全被拒却仍花 4/5 epoch；停手不改变已选模型，只省算力 | `reports/v2_replay_v1.md`、v1 trial report |
+| 2026-11-23 | 回归 gap 改为相对 RMSE，`best` 不再用 0 初始化 | 绝对值 600/50 会把任何阈值冲垮，导致每轮无条件重训 | `src/harness/round_controller.py`、单测 |
+| 2026-11-23 | 模型裁决只允许“收窄/保持/回滚”，不允许放大预算 | 4B 基础模型可能给出不可靠建议；规则保底、模型只能减少风险，符合“受控 RSI” | `apply_verdict()`、`docs/04` §4.6 |
+| 2026-11-23 | 平台入口接入 Gatekeeper（白名单/幅度/次数/kill-switch） | v1 平台路径绕过了本地闸门；专家分里的“安全/受控实验”需要证据 | `harness/contest_submission.py`、`scripts/check_guard.py` |

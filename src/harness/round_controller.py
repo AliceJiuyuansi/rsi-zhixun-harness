@@ -1,0 +1,494 @@
+"""Round-level controller for the platform harness (protocol v2).
+
+Everything here is a pure function of numbers and dictionaries, so the
+interesting decisions can be replayed and unit-tested without a host process.
+The platform entry (`harness/contest_submission.py`) only wires I/O around it.
+
+Why this module exists
+----------------------
+The first trial (v1, 2026-11-21) completed all 10 rounds on A/B/C, but the
+report exposed four problems that only show up on the real host:
+
+1. regression state initialised ``best_val`` to ``0.0``; every regression round
+   then looked like a 600-unit drop and retrained 5 epochs unconditionally;
+2. ``ModelReceipt.text`` was empty for Qwen3.5 (the reply lives in
+   ``reasoning_content``), so every round finished with ``reason="no model text"``;
+3. candidates that were *not* better (rounds 4-10 on C, 3-10 on B) were still
+   retrained every round before being rejected - pure waste;
+4. drift was measured against the *current* train/validation split, not against
+   the previous stage or the model's own reference, so it could not tell
+   "new stage arrived" from "same data, different model".
+
+The controller keeps a compact reference profile in native state and makes the
+budget a function of (stage change, data growth, drift, last gain, stalls).
+"""
+from __future__ import annotations
+
+import json
+import math
+import re
+from typing import Any
+
+import numpy as np
+
+# --- drift bands (same semantics as src/policy/strategy.py) --------------
+PSI_STABLE = 0.10
+PSI_MILD = 0.25
+
+# --- acceptance / gain thresholds ---------------------------------------
+CLASS_ACCEPT_TOL = 0.001      # macro-F1 we tolerate as noise
+REG_ACCEPT_TOL = 0.002        # relative RMSE we tolerate as noise
+CLASS_MIN_GAIN = 0.002        # a promotion must gain at least this much F1
+REG_MIN_GAIN = 0.002          # ... or 0.2% relative RMSE
+STALL_LIMIT = 2               # two fruitless updates in a row -> stop spending
+
+# --- epoch caps per dataset (measured on the v1 trial) ------------------
+EPOCH_CAP = {"A": 5, "B": 4, "C": 3}
+FIRST_ROUND_EPOCHS = {"A": 5, "B": 5, "C": 3}
+FIRST_ROUND_LR = {"A": 2e-3, "B": 2e-3, "C": 2e-3}
+CALIBRATION_EPOCHS = {"classification": 1, "regression": 3}
+CALIBRATION_LR = {"classification": 1e-3, "regression": 1e-3}
+RECOVER_EPOCHS = {"A": 3, "B": 2, "C": 2}
+RECOVER_LR = 1.5e-3
+NEW_STAGE_EPOCHS = {"A": 3, "B": 3, "C": 2}
+
+_EPS = 1e-9
+
+
+def _finite(value: Any, default: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
+
+def _normalise(shares) -> np.ndarray | None:
+    array = np.asarray(shares, dtype=float).reshape(-1)
+    if array.size == 0 or not np.all(np.isfinite(array)) or array.sum() <= 0:
+        return None
+    return np.clip(array / array.sum(), 1e-6, None)
+
+
+# --------------------------------------------------------------- profiles
+def feature_profile(rows, bins: int = 8) -> list[dict] | None:
+    """Per-feature histogram profile: quantile edges plus reference shares.
+
+    ``shares`` are what later rounds compare against; keeping only the edges
+    would make it impossible to rebuild the reference distribution exactly.
+    """
+    matrix = np.asarray(rows, dtype=float)
+    if matrix.ndim != 2 or matrix.shape[1] == 0 or len(matrix) < bins * 2:
+        return None
+    profile: list[dict] = []
+    for column in range(matrix.shape[1]):
+        values = matrix[:, column]
+        if not np.all(np.isfinite(values)):
+            profile.append({})
+            continue
+        edges = np.unique(np.quantile(values, np.linspace(0.0, 1.0, bins + 1)))
+        if edges.size < 3:
+            profile.append({})
+            continue
+        counts, _ = np.histogram(values, bins=edges)
+        shares = _normalise(counts)
+        if shares is None:
+            profile.append({})
+            continue
+        profile.append({"edges": [round(float(v), 6) for v in edges],
+                        "shares": [round(float(v), 6) for v in shares]})
+    return profile
+
+
+def psi_against(profile, rows) -> float:
+    """Largest PSI between the stored reference profile and the new rows."""
+    matrix = np.asarray(rows, dtype=float)
+    if not profile or matrix.ndim != 2 or len(matrix) < 10:
+        return 0.0
+    if len(profile) != matrix.shape[1]:
+        return 0.0
+    scores: list[float] = []
+    for column, reference in enumerate(profile):
+        if not isinstance(reference, dict) or not reference.get("edges"):
+            continue
+        edges = np.asarray(reference["edges"], dtype=float)
+        expected = _normalise(reference.get("shares") or [])
+        if expected is None or edges.size < 3:
+            continue
+        values = matrix[:, column]
+        if not np.all(np.isfinite(values)):
+            continue
+        actual_counts, _ = np.histogram(values, bins=edges)
+        actual = _normalise(actual_counts)
+        if actual is None:
+            continue
+        scores.append(float(np.sum((actual - expected) * np.log(actual / expected))))
+    return float(max(scores)) if scores else 0.0
+
+
+def js_divergence(left, right) -> float:
+    """Jensen-Shannon distance (sqrt of divergence), 0 = identical."""
+    first = _normalise(left)
+    second = _normalise(right)
+    if first is None or second is None or first.size != second.size:
+        return 0.0
+    middle = 0.5 * (first + second)
+    divergence = 0.5 * np.sum(first * np.log(first / middle)) + \
+        0.5 * np.sum(second * np.log(second / middle))
+    return float(math.sqrt(max(divergence, 0.0)))
+
+
+def prediction_profile(predictions, task: str, classes: list[str],
+                       reference_edges=None) -> dict | None:
+    """Class distribution (classification) or prediction histogram (regression)."""
+    array = np.asarray(predictions, dtype=float)
+    if array.ndim == 0 or len(array) == 0:
+        return None
+    if task == "classification":
+        matrix = array if array.ndim == 2 else array.reshape(1, -1)
+        if matrix.shape[1] != len(classes):
+            return None
+        labels = matrix.argmax(axis=1)
+        counts = np.bincount(labels, minlength=len(classes)).astype(float)
+        shares = _normalise(counts)
+        if shares is None:
+            return None
+        return {"kind": "class", "labels": list(classes),
+                "shares": [round(float(v), 6) for v in shares],
+                "mean_confidence": round(float(matrix.max(axis=1).mean()), 6)}
+
+    values = array.reshape(-1)
+    values = values[np.isfinite(values)]
+    if values.size < 10:
+        return None
+    if reference_edges is not None and len(reference_edges) >= 3:
+        edges = np.asarray(reference_edges, dtype=float)
+    else:
+        edges = np.unique(np.quantile(values, np.linspace(0.0, 1.0, 11)))
+        if edges.size < 3:
+            return None
+    counts, _ = np.histogram(values, bins=edges)
+    shares = _normalise(counts)
+    if shares is None:
+        return None
+    return {"kind": "value", "edges": [round(float(v), 6) for v in edges],
+            "shares": [round(float(v), 6) for v in shares]}
+
+
+def metric_value(task: str, metrics: dict | None) -> tuple[str, float, bool]:
+    """Return (metric name, native value, higher_is_better)."""
+    payload = metrics or {}
+    if task == "classification":
+        if "macro_f1" in payload:
+            return "macro_f1", _finite(payload["macro_f1"]), True
+        return "accuracy", _finite(payload.get("accuracy")), True
+    if "rmse" in payload:
+        return "rmse", _finite(payload["rmse"]), False
+    return "mae", _finite(payload.get("mae")), False
+
+
+def score_gap(best: float, last: float, higher_is_better: bool) -> float:
+    """How far the last selected model fell behind the best one (0 = no drop)."""
+    if higher_is_better:
+        return max(best - last, 0.0)
+    return max(last - best, 0.0) / max(abs(best), _EPS)
+
+
+# --------------------------------------------------------------- verdicts
+def extract_text(response: dict | None) -> str:
+    """Best-effort text from an OpenAI-style model response.
+
+    Qwen3.5-4B (the v1 binding) puts its chain of thought in
+    ``reasoning_content`` and leaves ``content`` empty, which is why v1 wrote
+    ``reason="no model text"``. We accept either, plus list-shaped content.
+    """
+    if not isinstance(response, dict):
+        return ""
+    try:
+        message = response["choices"][0].get("message") or {}
+    except (KeyError, IndexError, TypeError):
+        message = {}
+    for key in ("content", "reasoning_content", "reasoning"):
+        value = message.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, list):
+            parts = [item.get("text", "") for item in value if isinstance(item, dict)]
+            joined = "".join(parts).strip()
+            if joined:
+                return joined
+    text = response.get("output_text")
+    return text.strip() if isinstance(text, str) else ""
+
+
+def parse_verdict(text: str) -> dict | None:
+    """Extract the first JSON object that looks like a decision. Never raises."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r"\{", text):
+        try:
+            payload, _ = decoder.raw_decode(text[match.start():])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        decision = payload.get("decision", payload.get("action", payload.get("verdict")))
+        if not isinstance(decision, str):
+            continue
+        decision = decision.strip().lower()
+        if decision in ("train", "continue", "update", "finetune", "retrain"):
+            action = "train"
+        elif decision in ("hold", "keep", "none", "wait", "noop", "freeze"):
+            action = "hold"
+        elif decision in ("rollback", "revert", "reject"):
+            action = "rollback"
+        else:
+            continue
+        return {
+            "action": action,
+            "epochs": _finite(payload.get("epochs"), 0.0),
+            "lr": _finite(payload.get("lr", payload.get("learning_rate")), 0.0),
+            "reason": str(payload.get("reason", ""))[:400],
+        }
+    return None
+
+
+# --------------------------------------------------------------- history
+def summarise_history(records, state: dict, task: str) -> dict:
+    """Turn platform history + native state into the few numbers we act on."""
+    points: list[dict] = []
+    baseline = state.get("baseline")
+    first_round = records[0].get("round_index") if records and isinstance(records[0], dict) else None
+    previous_value = _finite(baseline, 0.0) if baseline is not None and first_round in (1, None) else None
+    for record in records or []:
+        if not isinstance(record, dict):
+            continue
+        configuration = record.get("configuration") or {}
+        metrics = record.get("validation_metrics") or {}
+        if not metrics:
+            candidates = record.get("candidates") or []
+            if candidates and isinstance(candidates[0], dict):
+                metrics = candidates[0].get("validation_metrics") or {}
+        name, value, higher = metric_value(task, metrics)
+        gain = None
+        if previous_value is not None:
+            gain = (value - previous_value) if higher else (previous_value - value) / max(abs(previous_value), _EPS)
+        points.append({
+            "round": record.get("round_index"),
+            "decision": record.get("decision", ""),
+            "epochs": int(_finite(configuration.get("epochs"), 0.0)),
+            "gain": None if gain is None else round(float(gain), 6),
+            "value": round(float(value), 6) if value else None,
+        })
+        if value:
+            previous_value = value
+
+    native = state.get("decisions") if isinstance(state.get("decisions"), list) else []
+    if not points and native:
+        points = [dict(item) for item in native if isinstance(item, dict)]
+
+    last_gain = _finite(state.get("last_gain"), 0.0)
+    stalled = int(_finite(state.get("stalled"), 0.0))
+    last_rejected = bool(state.get("last_rejected", False))
+    if "last_gain" not in state and points:
+        gains = [p["gain"] for p in points if p.get("gain") is not None]
+        if gains:
+            last_gain = float(gains[-1])
+    if "stalled" not in state and points:
+        trailing = 0
+        for point in reversed(points):
+            gain = point.get("gain")
+            if point.get("decision") == "retain" or (gain is not None and gain < CLASS_MIN_GAIN):
+                trailing += 1
+            else:
+                break
+        stalled = trailing
+        last_rejected = bool(points and points[-1].get("decision") in ("retain", "rollback"))
+
+    recent = points[-3:]
+    return {
+        "recent": recent,
+        "last_gain": round(float(last_gain), 6),
+        "stalled": stalled,
+        "last_rejected": last_rejected,
+        "evidence": "；".join(
+            f"第{item.get('round')}轮 {item.get('decision') or '?'}"
+            f"(epochs={item.get('epochs')}, gain={item.get('gain')})"
+            for item in recent) or "无历史轮次",
+    }
+
+
+# --------------------------------------------------------------- budget
+def choose_budget(*, dataset_key: str, task: str, round_index: int,
+                  psi_prev: float, psi_holdout: float, data_grew: bool,
+                  stage_changed: bool, gap: float, history: dict) -> dict:
+    """Return the rule-based budget plus the sentence that justifies it.
+
+    Precedence (cheap first):
+      round 1 -> real attempt; new stage -> moderate; recovery -> moderate;
+      last update paid off -> one cheap calibration; otherwise -> no spend.
+    """
+    cap = EPOCH_CAP.get(dataset_key, 3)
+    stalled = int(history.get("stalled", 0))
+    last_gain = _finite(history.get("last_gain"), 0.0)
+    psi = max(_finite(psi_prev), 0.0)
+    signals = {"psi_prev": round(psi, 4), "psi_holdout": round(_finite(psi_holdout), 4),
+               "data_grew": bool(data_grew), "stage_changed": bool(stage_changed),
+               "gap": round(_finite(gap), 6), "stalled": stalled,
+               "last_gain": round(last_gain, 6)}
+
+    if history.get("kill_switch"):
+        return {"action": "none", "epochs": 0, "lr": 0.0, "rule": "kill_switch",
+                "reason": "kill-switch latched; keep the parent model", "signals": signals}
+
+    if round_index <= 1:
+        epochs = FIRST_ROUND_EPOCHS.get(dataset_key, 3)
+        return {"action": "finetune", "epochs": epochs,
+                "lr": FIRST_ROUND_LR.get(dataset_key, 2e-3), "rule": "first_round",
+                "reason": "首轮：在父检查点上做一次真实续训，给后续轮次一个可比较的起点",
+                "signals": signals}
+
+    if stalled >= STALL_LIMIT and not stage_changed:
+        if data_grew:
+            return {"action": "finetune", "epochs": 1, "lr": CALIBRATION_LR.get(task, 1e-3),
+                    "rule": "new_data_probe",
+                    "reason": "此前连续无收益，但训练数据又增长了；只用 1 个 epoch 做探针，避免重复浪费",
+                    "signals": signals}
+        return {"action": "none", "epochs": 0, "lr": 0.0, "rule": "stalled",
+                "reason": f"连续 {stalled} 轮更新没有带来可测提升，停止消耗算力，保持父模型",
+                "signals": signals}
+
+    new_data = stage_changed or data_grew
+    if new_data:
+        label = "新阶段数据到达" if stage_changed else "同一阶段内训练数据增长"
+        if psi >= PSI_MILD:
+            epochs = min(NEW_STAGE_EPOCHS.get(dataset_key, 3), cap)
+            rule = "new_stage_drift"
+            why = f"{label}，且输入相对上一轮移动 PSI={psi:.3f} 超阈值 {PSI_MILD}，做一次中等预算适配"
+        else:
+            epochs = min(CALIBRATION_EPOCHS.get(task, 1) + 1, cap)
+            rule = "new_stage"
+            why = f"{label}，输入移动较小（PSI={psi:.3f}），只做一次小步适配"
+        return {"action": "finetune", "epochs": epochs, "lr": RECOVER_LR,
+                "rule": rule, "reason": why, "signals": signals}
+
+    if gap >= CLASS_MIN_GAIN and psi >= PSI_MILD:
+        return {"action": "finetune", "epochs": min(RECOVER_EPOCHS.get(dataset_key, 2), cap),
+                "lr": RECOVER_LR, "rule": "covariate_recover",
+                "reason": f"输入漂移 PSI={psi:.3f} 且指标回落 {gap:.4f}，做恢复性续训",
+                "signals": signals}
+
+    if gap >= 4 * CLASS_MIN_GAIN:
+        return {"action": "finetune", "epochs": min(RECOVER_EPOCHS.get(dataset_key, 2), cap),
+                "lr": RECOVER_LR, "rule": "concept_recover",
+                "reason": f"输入未大动但指标回落 {gap:.4f}，按 concept drift 做小步恢复",
+                "signals": signals}
+
+    if last_gain > 0 and stalled == 0:
+        epochs = min(CALIBRATION_EPOCHS.get(task, 1), cap)
+        return {"action": "finetune", "epochs": epochs,
+                "lr": CALIBRATION_LR.get(task, 1e-3), "rule": "calibration",
+                "reason": f"上一轮有正收益(+{last_gain:g})，用 {epochs} 个 epoch 做廉价校准",
+                "signals": signals}
+
+    return {"action": "none", "epochs": 0, "lr": 0.0, "rule": "quiet",
+            "reason": "无新阶段、无显著漂移、上轮无正收益；本轮只观察，不花算力",
+            "signals": signals}
+
+
+def apply_verdict(budget: dict, verdict: dict | None, history: dict,
+                  round_index: int) -> dict:
+    """Let the model *reduce* the rule budget, never silently enlarge it."""
+    if not verdict:
+        return {**budget, "model_action": "unavailable", "model_reason": ""}
+    if budget.get("action") == "none" or int(_finite(budget.get("epochs"), 0)) <= 0:
+        return {**budget, "action": "none", "epochs": 0, "lr": 0.0,
+                "model_action": "train_ignored_rule_none" if verdict["action"] == "train"
+                else verdict["action"],
+                "model_reason": verdict.get("reason", "")}
+    model_action = verdict["action"]
+    if model_action == "rollback":
+        return {**budget, "action": "none", "epochs": 0, "lr": 0.0,
+                "rule": "model_rollback", "model_action": "rollback",
+                "model_reason": verdict.get("reason", ""),
+                "reason": "模型裁决回滚到父模型；本轮不训练"}
+    if model_action == "hold":
+        signals = budget.get("signals") or {}
+        drift_justifies_update = bool(signals.get("stage_changed")) and \
+            _finite(signals.get("psi_prev"), 0.0) >= PSI_MILD
+        if round_index <= 1 or drift_justifies_update:
+            return {**budget, "model_action": "hold_ignored_drift",
+                    "model_reason": verdict.get("reason", "")}
+        return {**budget, "action": "none", "epochs": 0, "lr": 0.0,
+                "rule": "model_hold", "model_action": "hold",
+                "model_reason": verdict.get("reason", ""),
+                "reason": "模型裁决保持父模型；本轮不训练"}
+    if round_index <= 1:
+        # The first round is the only guaranteed real attempt; do not let a
+        # 4B model shave it down to a token update.
+        return {**budget, "model_action": "train_ignored_first_round",
+                "model_reason": verdict.get("reason", "")}
+    # "train": adopt the smaller epoch count, keep the rule's lr unless the
+    # model proposed a sane one. A model may reduce a justified update, but it
+    # may not turn a real attempt into a token one.
+    floor = 1
+    if budget.get("rule") in ("first_round", "new_stage_drift", "covariate_recover"):
+        floor = min(int(budget.get("epochs", 1)), 2)
+    proposed_epochs = int(verdict.get("epochs") or budget.get("epochs", 0))
+    epochs = max(floor, min(int(budget.get("epochs", 0)), proposed_epochs))
+    if epochs <= 0:
+        epochs = int(budget.get("epochs", 0))
+    lr = _finite(verdict.get("lr"), 0.0)
+    lr = lr if 1e-4 <= lr <= 1e-2 else budget.get("lr", 1e-3)
+    return {**budget, "epochs": epochs, "lr": lr, "action": "finetune" if epochs else "none",
+            "model_action": "train", "model_reason": verdict.get("reason", "")}
+
+
+# --------------------------------------------------------------- acceptance
+def acceptance(before: dict, after: dict, task: str) -> dict:
+    """Should the candidate replace the parent, and is the gain worth a upload?"""
+    before_name, before_value, higher = metric_value(task, before)
+    after_name, after_value, _ = metric_value(task, after)
+    if higher:
+        gain = after_value - before_value
+        accepted = gain >= -CLASS_ACCEPT_TOL
+        promote = gain >= CLASS_MIN_GAIN
+    else:
+        gain = (before_value - after_value) / max(abs(before_value), _EPS)
+        accepted = gain >= -REG_ACCEPT_TOL
+        promote = gain >= REG_MIN_GAIN
+    return {
+        "metric": after_name or before_name,
+        "before": round(float(before_value), 6),
+        "after": round(float(after_value), 6),
+        "gain": round(float(gain), 6),
+        "accepted": bool(accepted),
+        "promote": bool(promote and accepted),
+    }
+
+
+def decision_record(*, round_index: int, stage_id: str, dataset_key: str,
+                    action: dict, history: dict, psi: dict, model_verdict: str,
+                    outcome: dict | None, accepted: bool, region: str = "") -> dict:
+    """One compact line for state/decisions.jsonl and the next round's prompt."""
+    return {
+        "round": int(round_index),
+        "stage": stage_id,
+        "dataset": dataset_key,
+        "rule": action.get("rule", ""),
+        "action": action.get("action", "none"),
+        "epochs": int(action.get("epochs", 0)),
+        "lr": round(_finite(action.get("lr"), 0.0), 6),
+        "psi": psi,
+        "history": history.get("evidence", ""),
+        "model_action": action.get("model_action", "unavailable"),
+        "model_reason": (action.get("model_reason") or "")[:200],
+        "model_text": (model_verdict or "")[:200],
+        "outcome": outcome or {},
+        "accepted": bool(accepted),
+        "last_gain": round(_finite(history.get("last_gain"), 0.0), 6),
+        "stalled": int(history.get("stalled", 0)),
+        "reason": action.get("reason", ""),
+        "region": region,
+    }
