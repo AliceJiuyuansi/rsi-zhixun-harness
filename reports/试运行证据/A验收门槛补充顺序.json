@@ -1,0 +1,378 @@
+{
+  "7": {
+    "v6": [
+      {
+        "round": 1,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 5
+      },
+      {
+        "round": 2,
+        "selected_macro_f1": 0.717026,
+        "promotions": 2,
+        "total_requested_epochs": 8
+      },
+      {
+        "round": 3,
+        "selected_macro_f1": 0.722348,
+        "promotions": 3,
+        "total_requested_epochs": 11
+      },
+      {
+        "round": 4,
+        "selected_macro_f1": 0.727677,
+        "promotions": 4,
+        "total_requested_epochs": 14
+      },
+      {
+        "round": 5,
+        "selected_macro_f1": 0.727677,
+        "promotions": 4,
+        "total_requested_epochs": 17
+      },
+      {
+        "round": 6,
+        "selected_macro_f1": 0.707867,
+        "promotions": 5,
+        "total_requested_epochs": 20
+      },
+      {
+        "round": 7,
+        "selected_macro_f1": 0.715229,
+        "promotions": 6,
+        "total_requested_epochs": 23
+      },
+      {
+        "round": 8,
+        "selected_macro_f1": 0.728261,
+        "promotions": 7,
+        "total_requested_epochs": 26
+      },
+      {
+        "round": 9,
+        "selected_macro_f1": 0.726166,
+        "promotions": 8,
+        "total_requested_epochs": 28
+      },
+      {
+        "round": 10,
+        "selected_macro_f1": 0.726166,
+        "promotions": 8,
+        "total_requested_epochs": 28
+      }
+    ],
+    "zero": [
+      {
+        "round": 1,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 5
+      },
+      {
+        "round": 2,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 8
+      },
+      {
+        "round": 3,
+        "selected_macro_f1": 0.717549,
+        "promotions": 2,
+        "total_requested_epochs": 11
+      },
+      {
+        "round": 4,
+        "selected_macro_f1": 0.723844,
+        "promotions": 3,
+        "total_requested_epochs": 14
+      },
+      {
+        "round": 5,
+        "selected_macro_f1": 0.723844,
+        "promotions": 3,
+        "total_requested_epochs": 17
+      },
+      {
+        "round": 6,
+        "selected_macro_f1": 0.723844,
+        "promotions": 3,
+        "total_requested_epochs": 20
+      },
+      {
+        "round": 7,
+        "selected_macro_f1": 0.723844,
+        "promotions": 3,
+        "total_requested_epochs": 23
+      },
+      {
+        "round": 8,
+        "selected_macro_f1": 0.724742,
+        "promotions": 4,
+        "total_requested_epochs": 26
+      },
+      {
+        "round": 9,
+        "selected_macro_f1": 0.725423,
+        "promotions": 5,
+        "total_requested_epochs": 28
+      },
+      {
+        "round": 10,
+        "selected_macro_f1": 0.725423,
+        "promotions": 5,
+        "total_requested_epochs": 28
+      }
+    ],
+    "margin": [
+      {
+        "round": 1,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 5
+      },
+      {
+        "round": 2,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 8
+      },
+      {
+        "round": 3,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 11
+      },
+      {
+        "round": 4,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 14
+      },
+      {
+        "round": 5,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 17
+      },
+      {
+        "round": 6,
+        "selected_macro_f1": 0.717226,
+        "promotions": 1,
+        "total_requested_epochs": 20
+      },
+      {
+        "round": 7,
+        "selected_macro_f1": 0.720565,
+        "promotions": 2,
+        "total_requested_epochs": 23
+      },
+      {
+        "round": 8,
+        "selected_macro_f1": 0.729886,
+        "promotions": 3,
+        "total_requested_epochs": 26
+      },
+      {
+        "round": 9,
+        "selected_macro_f1": 0.729886,
+        "promotions": 3,
+        "total_requested_epochs": 28
+      },
+      {
+        "round": 10,
+        "selected_macro_f1": 0.729886,
+        "promotions": 3,
+        "total_requested_epochs": 28
+      }
+    ]
+  },
+  "42": {
+    "v6": [
+      {
+        "round": 1,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 5
+      },
+      {
+        "round": 2,
+        "selected_macro_f1": 0.717601,
+        "promotions": 2,
+        "total_requested_epochs": 8
+      },
+      {
+        "round": 3,
+        "selected_macro_f1": 0.717601,
+        "promotions": 3,
+        "total_requested_epochs": 11
+      },
+      {
+        "round": 4,
+        "selected_macro_f1": 0.712682,
+        "promotions": 4,
+        "total_requested_epochs": 14
+      },
+      {
+        "round": 5,
+        "selected_macro_f1": 0.72683,
+        "promotions": 5,
+        "total_requested_epochs": 17
+      },
+      {
+        "round": 6,
+        "selected_macro_f1": 0.725695,
+        "promotions": 6,
+        "total_requested_epochs": 20
+      },
+      {
+        "round": 7,
+        "selected_macro_f1": 0.719784,
+        "promotions": 7,
+        "total_requested_epochs": 23
+      },
+      {
+        "round": 8,
+        "selected_macro_f1": 0.717688,
+        "promotions": 8,
+        "total_requested_epochs": 26
+      },
+      {
+        "round": 9,
+        "selected_macro_f1": 0.724213,
+        "promotions": 9,
+        "total_requested_epochs": 28
+      },
+      {
+        "round": 10,
+        "selected_macro_f1": 0.724213,
+        "promotions": 9,
+        "total_requested_epochs": 28
+      }
+    ],
+    "zero": [
+      {
+        "round": 1,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 5
+      },
+      {
+        "round": 2,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 8
+      },
+      {
+        "round": 3,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 11
+      },
+      {
+        "round": 4,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 14
+      },
+      {
+        "round": 5,
+        "selected_macro_f1": 0.719784,
+        "promotions": 2,
+        "total_requested_epochs": 17
+      },
+      {
+        "round": 6,
+        "selected_macro_f1": 0.719784,
+        "promotions": 2,
+        "total_requested_epochs": 20
+      },
+      {
+        "round": 7,
+        "selected_macro_f1": 0.725782,
+        "promotions": 3,
+        "total_requested_epochs": 23
+      },
+      {
+        "round": 8,
+        "selected_macro_f1": 0.725782,
+        "promotions": 3,
+        "total_requested_epochs": 26
+      },
+      {
+        "round": 9,
+        "selected_macro_f1": 0.725782,
+        "promotions": 3,
+        "total_requested_epochs": 28
+      },
+      {
+        "round": 10,
+        "selected_macro_f1": 0.725782,
+        "promotions": 3,
+        "total_requested_epochs": 28
+      }
+    ],
+    "margin": [
+      {
+        "round": 1,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 5
+      },
+      {
+        "round": 2,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 8
+      },
+      {
+        "round": 3,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 11
+      },
+      {
+        "round": 4,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 14
+      },
+      {
+        "round": 5,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 17
+      },
+      {
+        "round": 6,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 20
+      },
+      {
+        "round": 7,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 23
+      },
+      {
+        "round": 8,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 26
+      },
+      {
+        "round": 9,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 28
+      },
+      {
+        "round": 10,
+        "selected_macro_f1": 0.719784,
+        "promotions": 1,
+        "total_requested_epochs": 28
+      }
+    ]
+  }
+}

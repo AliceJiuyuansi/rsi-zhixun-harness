@@ -1,0 +1,250 @@
+{
+  "v4": [
+    {
+      "round": 1,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.021289,
+      "promotions": 1
+    },
+    {
+      "round": 2,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.001044,
+      "promotions": 1
+    },
+    {
+      "round": 3,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.001044,
+      "promotions": 1
+    },
+    {
+      "round": 4,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.001044,
+      "promotions": 1
+    },
+    {
+      "round": 5,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.001044,
+      "promotions": 1
+    },
+    {
+      "round": 6,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.001044,
+      "promotions": 1
+    },
+    {
+      "round": 7,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.017502,
+      "promotions": 1
+    },
+    {
+      "round": 8,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.001136,
+      "promotions": 1
+    },
+    {
+      "round": 9,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.001136,
+      "promotions": 1
+    },
+    {
+      "round": 10,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.012033,
+      "promotions": 1
+    }
+  ],
+  "v6": [
+    {
+      "round": 1,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.021289,
+      "promotions": 1
+    },
+    {
+      "round": 2,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": 0.001044,
+      "promotions": 2
+    },
+    {
+      "round": 3,
+      "selected_macro_f1": 0.734748,
+      "reported_last_gain": -0.001615,
+      "promotions": 3
+    },
+    {
+      "round": 4,
+      "selected_macro_f1": 0.739233,
+      "reported_last_gain": 0.004485,
+      "promotions": 4
+    },
+    {
+      "round": 5,
+      "selected_macro_f1": 0.739233,
+      "reported_last_gain": -0.036234,
+      "promotions": 4
+    },
+    {
+      "round": 6,
+      "selected_macro_f1": 0.739233,
+      "reported_last_gain": -0.035831,
+      "promotions": 4
+    },
+    {
+      "round": 7,
+      "selected_macro_f1": 0.739233,
+      "reported_last_gain": -0.030384,
+      "promotions": 4
+    },
+    {
+      "round": 8,
+      "selected_macro_f1": 0.728498,
+      "reported_last_gain": -0.010736,
+      "promotions": 5
+    },
+    {
+      "round": 9,
+      "selected_macro_f1": 0.722549,
+      "reported_last_gain": -0.005949,
+      "promotions": 6
+    },
+    {
+      "round": 10,
+      "selected_macro_f1": 0.722549,
+      "reported_last_gain": -0.005949,
+      "promotions": 6
+    }
+  ],
+  "v7_zero": [
+    {
+      "round": 1,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.021289,
+      "promotions": 1
+    },
+    {
+      "round": 2,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": 0.001044,
+      "promotions": 2
+    },
+    {
+      "round": 3,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": -0.001615,
+      "promotions": 2
+    },
+    {
+      "round": 4,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": 0.0,
+      "promotions": 3
+    },
+    {
+      "round": 5,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": -0.017774,
+      "promotions": 3
+    },
+    {
+      "round": 6,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": -0.017252,
+      "promotions": 3
+    },
+    {
+      "round": 7,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": -0.017252,
+      "promotions": 3
+    },
+    {
+      "round": 8,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": -0.017094,
+      "promotions": 3
+    },
+    {
+      "round": 9,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": -0.00218,
+      "promotions": 3
+    },
+    {
+      "round": 10,
+      "selected_macro_f1": 0.736363,
+      "reported_last_gain": -0.00218,
+      "promotions": 3
+    }
+  ],
+  "v7_margin": [
+    {
+      "round": 1,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.021289,
+      "promotions": 1
+    },
+    {
+      "round": 2,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.001044,
+      "promotions": 1
+    },
+    {
+      "round": 3,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.001044,
+      "promotions": 1
+    },
+    {
+      "round": 4,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": 0.001044,
+      "promotions": 1
+    },
+    {
+      "round": 5,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.017502,
+      "promotions": 1
+    },
+    {
+      "round": 6,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.01823,
+      "promotions": 1
+    },
+    {
+      "round": 7,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.017502,
+      "promotions": 1
+    },
+    {
+      "round": 8,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.015635,
+      "promotions": 1
+    },
+    {
+      "round": 9,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.0002,
+      "promotions": 1
+    },
+    {
+      "round": 10,
+      "selected_macro_f1": 0.735318,
+      "reported_last_gain": -0.0002,
+      "promotions": 1
+    }
+  ]
+}
