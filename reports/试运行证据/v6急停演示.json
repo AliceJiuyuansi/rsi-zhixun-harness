@@ -1,0 +1,30 @@
+{
+  "source_commit": "bb0a7f8b88c07c0eace93202de8861ecb9cf26f6",
+  "runtime": "host Python, contest-harness 1.0.4, official A",
+  "rows": 128,
+  "rounds": 1,
+  "model_stub": "empty",
+  "RSI_STOP": "1",
+  "rule_epochs": 5,
+  "gate_reason": "kill-switch: RSI_STOP set",
+  "selected": "baseline-A",
+  "state": {
+    "metric": "macro_f1",
+    "best": 0.71403,
+    "last": 0.71403,
+    "last_gain": 0.0,
+    "stalled": 0,
+    "updates": 0,
+    "promotions": 0,
+    "requested_epochs_total": 0
+  },
+  "predict": {
+    "outputs": [
+      {
+        "label": "Ethanol",
+        "score": 0.8446180407749447
+      }
+    ]
+  },
+  "predict_exit_code": 0
+}
