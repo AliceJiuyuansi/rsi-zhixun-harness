@@ -1,0 +1,20 @@
+{
+  "tag": "zhixun-rsi-harness:0.6",
+  "platform": "linux/amd64",
+  "archive": "zhixun-rsi-harness-0.6.tar",
+  "size_bytes": 67164160,
+  "sha256": "69d558fa3e877db1ecd5f3957ce621d94b6145df9c333531958b49250002f2c0",
+  "image_config": "sha256:156746603a2bcaa3db00511cbd32787c59a20c464ab9dcc42014578cf0ae59dd",
+  "verified_layer_count": 13,
+  "entrypoint": [
+    "python3",
+    "/app/harness.py"
+  ],
+  "c_calibration": false,
+  "source_commit": "bb0a7f8b88c07c0eace93202de8861ecb9cf26f6",
+  "verified_runtime_sources": [
+    "harness/contest_submission.py",
+    "src/harness/round_controller.py",
+    "vendor/contest_baselines/model.py"
+  ]
+}
