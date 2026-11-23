@@ -345,6 +345,17 @@ def choose_budget(*, dataset_key: str, task: str, round_index: int,
                 "reason": "首轮：在父检查点上做一次真实续训，给后续轮次一个可比较的起点",
                 "signals": signals}
 
+    if dataset_key == "A" and task == "classification":
+        return {"action": "finetune", "epochs": 3 if data_grew else 1,
+                "lr": RECOVER_LR if data_grew else CALIBRATION_LR[task],
+                "rule": "a_v1_fresh" if data_grew else "a_v1_quiet",
+                "reason": "A follows the v1 budget: three epochs on new rows, one on a quiet round",
+                "signals": signals}
+    if dataset_key == "C" and stage_changed:
+        return {"action": "finetune", "epochs": 1, "lr": RECOVER_LR,
+                "rule": "c_stage_probe", "reason": "Probe the new C stage with one epoch",
+                "signals": signals}
+
     if stalled >= STALL_LIMIT and not stage_changed:
         if data_grew:
             return {"action": "finetune", "epochs": 1, "lr": CALIBRATION_LR.get(task, 1e-3),
@@ -442,14 +453,19 @@ def apply_verdict(budget: dict, verdict: dict | None, history: dict,
 
 
 # --------------------------------------------------------------- acceptance
-def acceptance(before: dict, after: dict, task: str) -> dict:
+def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> dict:
     """Should the candidate replace the parent, and is the gain worth a upload?"""
     before_name, before_value, higher = metric_value(task, before)
     after_name, after_value, _ = metric_value(task, after)
     if higher:
         gain = after_value - before_value
-        accepted = gain >= -1e-9
-        promote = gain >= CLASS_MIN_GAIN
+        if dataset_key == "A":
+            # The v1 macro-F1 tolerance also promoted ties and small regressions.
+            accepted = after_value >= before_value - 0.02
+            promote = accepted
+        else:
+            accepted = gain >= -1e-9
+            promote = gain >= CLASS_MIN_GAIN
     else:
         gain = (before_value - after_value) / max(abs(before_value), _EPS)
         accepted = gain >= -1e-9

@@ -1,0 +1,14 @@
+reference: v4
+platform_rounds_per_task: 10
+requested_epoch_limits: {A: 28, B: 25, C: 13}
+A:
+  first_epoch_lr: [5, 0.002]
+  fresh_rows_epoch_lr: [3, 0.0015]
+  quiet_epoch_lr: [1, 0.001]
+  macro_f1_acceptance_margin: 0.02
+B:
+  max_prediction_minutes: 1200
+C:
+  max_prediction_cycles: 260
+  operating_condition_residual: false
+  new_stage_probe_epochs: 1

@@ -1,0 +1,842 @@
+{
+  "version": 3,
+  "run_id": "27143ad15abd6f1a4daf998200625545",
+  "submission_id": "b318577fbc02cdfeb8504ac94c707c10",
+  "created_at_utc": "2026-11-23T13:55:02.18287Z",
+  "mode": "trial",
+  "costs": {
+    "completion_tokens": 7680,
+    "prompt_tokens": 24305,
+    "total_tokens": 31985,
+    "training_seconds": 1822.8078196668066
+  },
+  "datasets": {
+    "A": {
+      "metrics": {
+        "accuracy": 0.8729021694637741,
+        "macro_f1": 0.8674262484906565
+      },
+      "prediction_count": 4886,
+      "cpu_seconds": 962.139093252,
+      "wall_seconds": 1261.7981950682588,
+      "record_complete": true,
+      "rounds": [
+        {
+          "round_index": 1,
+          "stage_id": "A-stage-01",
+          "decision": "promote",
+          "validation_metrics": {
+            "accuracy": 0.8858520900321544,
+            "macro_f1": 0.7187354630392222
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-01-1",
+          "configuration": {
+            "rule": "first_round",
+            "epochs": 5.0,
+            "lr": 0.002,
+            "gain": 0.004706,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 445.0,
+              "validation": 1244.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 2,
+          "stage_id": "A-stage-01",
+          "decision": "retain",
+          "validation_metrics": {
+            "accuracy": 0.8858520900321544,
+            "macro_f1": 0.7187354630392222
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-01-1",
+          "configuration": {
+            "rule": "calibration",
+            "epochs": 1.0,
+            "lr": 0.001,
+            "gain": 0,
+            "accepted": true,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 445.0,
+              "validation": 1244.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 3,
+          "stage_id": "A-stage-02",
+          "decision": "promote",
+          "validation_metrics": {
+            "accuracy": 0.9307075127644056,
+            "macro_f1": 0.8152229603087621
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-03-1",
+          "configuration": {
+            "rule": "new_stage_drift",
+            "epochs": 3.0,
+            "lr": 0.0015,
+            "gain": 0.112296,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 952.0,
+              "validation": 1371.0
+            },
+            "psi_prev": 0.5731
+          }
+        },
+        {
+          "round_index": 4,
+          "stage_id": "A-stage-02",
+          "decision": "promote",
+          "validation_metrics": {
+            "accuracy": 0.9569657184536834,
+            "macro_f1": 0.8550364784685666
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-04-1",
+          "configuration": {
+            "rule": "calibration",
+            "epochs": 1.0,
+            "lr": 0.001,
+            "gain": 0.039814,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 952.0,
+              "validation": 1371.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 5,
+          "stage_id": "A-stage-03",
+          "decision": "promote",
+          "validation_metrics": {
+            "accuracy": 0.9747109826589595,
+            "macro_f1": 0.909245633985775
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-05-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 2.0,
+            "lr": 0.0015,
+            "gain": 0.059145,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 1003.0,
+              "validation": 1384.0
+            },
+            "psi_prev": 0.0065
+          }
+        },
+        {
+          "round_index": 6,
+          "stage_id": "A-stage-04",
+          "decision": "retain",
+          "validation_metrics": {
+            "accuracy": 0.9714285714285714,
+            "macro_f1": 0.905230097601763
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-05-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 2.0,
+            "lr": 0.0015,
+            "gain": 0.001255,
+            "accepted": true,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 1065.0,
+              "validation": 1400.0
+            },
+            "psi_prev": 0.0108
+          }
+        },
+        {
+          "round_index": 7,
+          "stage_id": "A-stage-05",
+          "decision": "promote",
+          "validation_metrics": {
+            "accuracy": 0.9709595959595959,
+            "macro_f1": 0.9628360959308689
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-07-1",
+          "configuration": {
+            "rule": "new_stage_drift",
+            "epochs": 3.0,
+            "lr": 0.0015,
+            "gain": 0.154304,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 1801.0,
+              "validation": 1584.0
+            },
+            "psi_prev": 0.3821
+          }
+        },
+        {
+          "round_index": 8,
+          "stage_id": "A-stage-06",
+          "decision": "promote",
+          "validation_metrics": {
+            "accuracy": 0.9679658302189001,
+            "macro_f1": 0.9614603760271404
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-08-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 2.0,
+            "lr": 0.0015,
+            "gain": 0.055059,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 2957.0,
+              "validation": 1873.0
+            },
+            "psi_prev": 0.1585
+          }
+        },
+        {
+          "round_index": 9,
+          "stage_id": "A-stage-07",
+          "decision": "promote",
+          "validation_metrics": {
+            "accuracy": 0.9678439641539273,
+            "macro_f1": 0.958569385797677
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-09-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 2.0,
+            "lr": 0.0015,
+            "gain": 0.005315,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 3050.0,
+              "validation": 1897.0
+            },
+            "psi_prev": 0.0047
+          }
+        },
+        {
+          "round_index": 10,
+          "stage_id": "A-stage-08",
+          "decision": "promote",
+          "validation_metrics": {
+            "accuracy": 0.9726098191214471,
+            "macro_f1": 0.9626742740794089
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-A-round-10-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 2.0,
+            "lr": 0.0015,
+            "gain": 0.014498,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 3200.0,
+              "validation": 1935.0
+            },
+            "psi_prev": 0.0093
+          }
+        }
+      ]
+    },
+    "B": {
+      "metrics": {
+        "mae": 251.69772471042572,
+        "rmse": 352.08292078326355
+      },
+      "prediction_count": 200,
+      "cpu_seconds": 342.67809062500004,
+      "wall_seconds": 631.3034815588035,
+      "record_complete": true,
+      "rounds": [
+        {
+          "round_index": 1,
+          "stage_id": "B-stage-01",
+          "decision": "promote",
+          "validation_metrics": {
+            "mae": 550.0441307953782,
+            "rmse": 660.3886889170046
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-01-1",
+          "configuration": {
+            "rule": "first_round",
+            "epochs": 5.0,
+            "lr": 0.002,
+            "gain": 0.030494,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 7032.0,
+              "validation": 1679.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 2,
+          "stage_id": "B-stage-01",
+          "decision": "promote",
+          "validation_metrics": {
+            "mae": 546.0826150608362,
+            "rmse": 654.9693622975
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-02-1",
+          "configuration": {
+            "rule": "calibration",
+            "epochs": 3.0,
+            "lr": 0.001,
+            "gain": 0.008206,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 7032.0,
+              "validation": 1679.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 3,
+          "stage_id": "B-stage-01",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 546.0826150608362,
+            "rmse": 654.9693622975
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-02-1",
+          "configuration": {
+            "rule": "calibration",
+            "epochs": 3.0,
+            "lr": 0.001,
+            "gain": -0.014952,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 7032.0,
+              "validation": 1679.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 4,
+          "stage_id": "B-stage-01",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 546.0826150608362,
+            "rmse": 654.9693622975
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-02-1",
+          "configuration": {
+            "rule": "quiet",
+            "epochs": 0,
+            "lr": 0,
+            "gain": null,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 7032.0,
+              "validation": 1679.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 5,
+          "stage_id": "B-stage-02",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 546.3485358347159,
+            "rmse": 655.2412862079965
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-02-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 4.0,
+            "lr": 0.0015,
+            "gain": -0.025156,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 7048.0,
+              "validation": 1683.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 6,
+          "stage_id": "B-stage-02",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 546.3485358347159,
+            "rmse": 655.2412862079965
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-02-1",
+          "configuration": {
+            "rule": "stalled",
+            "epochs": 0,
+            "lr": 0,
+            "gain": null,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 7048.0,
+              "validation": 1683.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 7,
+          "stage_id": "B-stage-02",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 546.3485358347159,
+            "rmse": 655.2412862079965
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-02-1",
+          "configuration": {
+            "rule": "stalled",
+            "epochs": 0,
+            "lr": 0,
+            "gain": null,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 7048.0,
+              "validation": 1683.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 8,
+          "stage_id": "B-stage-03",
+          "decision": "promote",
+          "validation_metrics": {
+            "mae": 549.8396818156882,
+            "rmse": 655.7684811770872
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-08-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 4.0,
+            "lr": 0.0015,
+            "gain": 0.003297,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 7156.0,
+              "validation": 1710.0
+            },
+            "psi_prev": 0.0015
+          }
+        },
+        {
+          "round_index": 9,
+          "stage_id": "B-stage-03",
+          "decision": "promote",
+          "validation_metrics": {
+            "mae": 548.4051630053922,
+            "rmse": 652.9424694044371
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-09-1",
+          "configuration": {
+            "rule": "calibration",
+            "epochs": 3.0,
+            "lr": 0.001,
+            "gain": 0.004309,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 7156.0,
+              "validation": 1710.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 10,
+          "stage_id": "B-stage-03",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 548.4051630053922,
+            "rmse": 652.9424694044371
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-B-round-09-1",
+          "configuration": {
+            "rule": "calibration",
+            "epochs": 3.0,
+            "lr": 0.001,
+            "gain": -0.010395,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 7156.0,
+              "validation": 1710.0
+            },
+            "psi_prev": 0
+          }
+        }
+      ]
+    },
+    "C": {
+      "metrics": {
+        "mae": 43.78711436250306,
+        "nasa_score": 2440040141804.947,
+        "rmse": 62.88107751184985
+      },
+      "prediction_count": 9687,
+      "cpu_seconds": 1770.3465343759995,
+      "wall_seconds": 1836.7683304729871,
+      "record_complete": true,
+      "rounds": [
+        {
+          "round_index": 1,
+          "stage_id": "C-stage-01",
+          "decision": "promote",
+          "validation_metrics": {
+            "mae": 41.1931736463929,
+            "nasa_score": 73379634596.83073,
+            "rmse": 58.52601599658888
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-01-1",
+          "configuration": {
+            "rule": "first_round",
+            "epochs": 3.0,
+            "lr": 0.002,
+            "gain": 0.009805,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 113089.0,
+              "validation": 23049.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 2,
+          "stage_id": "C-stage-01",
+          "decision": "promote",
+          "validation_metrics": {
+            "mae": 40.349286537795166,
+            "nasa_score": 73768152650.21548,
+            "rmse": 58.31133517757985
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-02-1",
+          "configuration": {
+            "rule": "calibration",
+            "epochs": 3.0,
+            "lr": 0.001,
+            "gain": 0.003823,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 113089.0,
+              "validation": 23049.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 3,
+          "stage_id": "C-stage-01",
+          "decision": "promote",
+          "validation_metrics": {
+            "mae": 40.53731798519986,
+            "nasa_score": 73461545779.30107,
+            "rmse": 58.15762270189759
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-03-1",
+          "configuration": {
+            "rule": "calibration",
+            "epochs": 3.0,
+            "lr": 0.001,
+            "gain": 0.008806,
+            "accepted": true,
+            "promoted": true,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 113089.0,
+              "validation": 23049.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 4,
+          "stage_id": "C-stage-02",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 40.49269724454373,
+            "nasa_score": 73466767339.5374,
+            "rmse": 58.079820106911114
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-03-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 3.0,
+            "lr": 0.0015,
+            "gain": -5.6e-05,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 114141.0,
+              "validation": 23313.0
+            },
+            "psi_prev": 0.0002
+          }
+        },
+        {
+          "round_index": 5,
+          "stage_id": "C-stage-02",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 40.49269724454373,
+            "nasa_score": 73466767339.5374,
+            "rmse": 58.079820106911114
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-03-1",
+          "configuration": {
+            "rule": "quiet",
+            "epochs": 0,
+            "lr": 0,
+            "gain": null,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 114141.0,
+              "validation": 23313.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 6,
+          "stage_id": "C-stage-02",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 40.49269724454373,
+            "nasa_score": 73466767339.5374,
+            "rmse": 58.079820106911114
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-03-1",
+          "configuration": {
+            "rule": "quiet",
+            "epochs": 0,
+            "lr": 0,
+            "gain": null,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 114141.0,
+              "validation": 23313.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 7,
+          "stage_id": "C-stage-03",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 40.340265194612584,
+            "nasa_score": 73468789065.36699,
+            "rmse": 57.798147883776586
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-03-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 3.0,
+            "lr": 0.0015,
+            "gain": -0.003335,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 116746.0,
+              "validation": 23965.0
+            },
+            "psi_prev": 0.0002
+          }
+        },
+        {
+          "round_index": 8,
+          "stage_id": "C-stage-03",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 40.340265194612584,
+            "nasa_score": 73468789065.36699,
+            "rmse": 57.798147883776586
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-03-1",
+          "configuration": {
+            "rule": "stalled",
+            "epochs": 0,
+            "lr": 0,
+            "gain": null,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 116746.0,
+              "validation": 23965.0
+            },
+            "psi_prev": 0
+          }
+        },
+        {
+          "round_index": 9,
+          "stage_id": "C-stage-04",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 40.497911097407204,
+            "nasa_score": 270854143522.45892,
+            "rmse": 58.15362054108235
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-03-1",
+          "configuration": {
+            "rule": "new_stage",
+            "epochs": 3.0,
+            "lr": 0.0015,
+            "gain": 0.00097,
+            "accepted": true,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": true,
+            "stage_changed": true,
+            "rows": {
+              "train": 117909.0,
+              "validation": 24256.0
+            },
+            "psi_prev": 0.0002
+          }
+        },
+        {
+          "round_index": 10,
+          "stage_id": "C-stage-04",
+          "decision": "retain",
+          "validation_metrics": {
+            "mae": 40.497911097407204,
+            "nasa_score": 270854143522.45892,
+            "rmse": 58.15362054108235
+          },
+          "selected_artifact_id": "model-27143ad15abd6f1a4daf998200625545-C-round-03-1",
+          "configuration": {
+            "rule": "stalled",
+            "epochs": 0,
+            "lr": 0,
+            "gain": null,
+            "accepted": false,
+            "promoted": false,
+            "model_action": "unavailable",
+            "data_grew": false,
+            "stage_changed": false,
+            "rows": {
+              "train": 117909.0,
+              "validation": 24256.0
+            },
+            "psi_prev": 0
+          }
+        }
+      ]
+    }
+  }
+}

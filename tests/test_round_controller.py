@@ -151,12 +151,13 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(budget["action"], "finetune")
         self.assertGreaterEqual(budget["epochs"], 2)
 
-    def test_quiet_round_does_nothing(self):
+    def test_a_quiet_round_uses_v1_one_epoch(self):
         budget = choose_budget(dataset_key="A", task="classification", round_index=4,
                                psi_prev=0.01, psi_holdout=0.01, data_grew=False,
                                stage_changed=False, gap=0.0,
                                history={"stalled": 0, "last_gain": 0.0})
-        self.assertEqual(budget["epochs"], 0)
+        self.assertEqual(budget["epochs"], 1)
+        self.assertEqual(budget["rule"], "a_v1_quiet")
 
     def test_model_cannot_resurrect_a_noop(self):
         rule = {"action": "none", "epochs": 0, "lr": 0.0, "rule": "stalled",
@@ -192,6 +193,10 @@ class BudgetTests(unittest.TestCase):
 
 
 class AcceptanceTests(unittest.TestCase):
+    def test_v1_tolerance_only_on_a(self):
+        self.assertTrue(acceptance({"macro_f1": .70}, {"macro_f1": .69}, "classification", "A")["promote"])
+        self.assertFalse(acceptance({"macro_f1": .70}, {"macro_f1": .67}, "classification", "A")["promote"])
+
     def test_classification_gain(self):
         out = acceptance({"macro_f1": 0.70}, {"macro_f1": 0.75}, "classification")
         self.assertTrue(out["promote"])

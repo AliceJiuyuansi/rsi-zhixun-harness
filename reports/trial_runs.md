@@ -1,5 +1,9 @@
 # 试运行记录（平台 `#runs`）
 
+<!-- latest-trials -->
+v4 已实测，v5 已启动，v6 以 v4 为对照先定稿。v6 恢复 A 的 v1 预算与验收容差，B/C 分别截断于 1,200 分钟、260 循环，三题最多 66 个请求 epoch。详见[本版方案与复现记录](../reports/版本方案/v6.md)。
+<!-- /latest-trials -->
+
 > 只记录平台真实返回的聚合结果，不补录、不美化。原始 JSON 在本机
 > `_state/trial_report_completed.json`（v1）、`_state/trial_report_v2.json`（v2）。
 > 更新：2026-11-23 22:35

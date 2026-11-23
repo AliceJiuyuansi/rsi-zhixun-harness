@@ -230,6 +230,16 @@ def train(rnd) -> None:
     model_text = extract_text(model_receipt.response)
     verdict = parse_verdict(model_text)
     decision = apply_verdict(budget, verdict, history, int(rnd.round_index))
+    # The host may start with an older state. Recover its spent budget from the
+    # platform's round records before assigning the next request.
+    prior_spend = sum(int((r.get("configuration") or {}).get("epochs") or 0)
+                      for r in (platform_history or []) if isinstance(r, dict))
+    prior_spend = max(prior_spend, int(previous_state.get("requested_epochs_total", 0)))
+    task_limit = {"A": 28, "B": 25, "C": 13}.get(str(rnd.dataset_key))
+    if task_limit is not None and decision["epochs"] > max(0, task_limit - prior_spend):
+        remaining = max(0, task_limit - prior_spend)
+        decision.update(epochs=remaining, action="finetune" if remaining else "none",
+                        rule="epoch_limit", reason="Remaining per-task epoch budget")
     log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
                   f"stage_changed={stage_changed} rule={budget['rule']} "
                   f"model={decision.get('model_action')} budget={decision['epochs']}ep")
@@ -292,7 +302,7 @@ def train(rnd) -> None:
                 change_summary=json.dumps({"rule": decision["rule"],
                                            "signals": decision["signals"]},
                                           ensure_ascii=False))
-            outcome = acceptance(round_result.metrics_before, round_result.metrics_after, task)
+            outcome = acceptance(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key))
             gate.commit(gated.action, step=int(rnd.round_index))
             gate.note_step_ok()
             audit.write("round_result", step=int(rnd.round_index), rule=decision["rule"],
@@ -399,6 +409,7 @@ def train(rnd) -> None:
         "round": int(rnd.round_index),
         "stage_id": stage_id or str(previous_state.get("stage_id", "")),
         "n_train": train_rows,
+        "requested_epochs_total": prior_spend + int(decision["epochs"]),
         "n_validation": validation_rows,
         "baseline": round(float(previous_state.get("baseline", metric_state["before"])), 6),
         "best": round(float(best_value), 6),

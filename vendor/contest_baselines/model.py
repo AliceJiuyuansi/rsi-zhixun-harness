@@ -160,11 +160,18 @@ class Model:
         if "c_calibration" in self.meta:
             try:
                 from .c_calibration import predict
-                return predict(x, prediction, self.meta["c_calibration"])
+                prediction = predict(x, prediction, self.meta["c_calibration"])
             except Exception:  # noqa: BLE001 - serving must fall back to the base model
                 # A malformed/unseen calibration must never fail the whole
                 # prediction; the parent MLP output is a safe fallback.
-                return prediction
+                pass
+        # Use the same limit for checkpoint evaluation and single-sample serving.
+        # Identify the contest schema so unrelated regression models retain their range.
+        paths = self.meta["paths"]
+        if len(paths) == 24 and paths[0] == '[["key","sensors"],["index",0]]':
+            return np.minimum(prediction, 260.0)
+        if len(paths) == 34 and paths[0] == '[["key","features"],["key","horizontal"],["key","band1_energy_0_2k"]]':
+            return np.minimum(prediction, 1200.0)
         return prediction
 
     def save(self, path):

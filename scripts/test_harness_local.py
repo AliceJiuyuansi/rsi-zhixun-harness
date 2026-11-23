@@ -90,6 +90,10 @@ def make_stub(round_box: dict, mode: str):
 
     def stub_model(bound_messages, options):
         round_index = round_box.get("round", 1)
+        if mode == "empty":
+            return {"request_id": f"call-stub-{round_index}",
+                    "choices": [{"message": {"role": "assistant", "content": ""}, "finish_reason": "length"}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 256, "total_tokens": 266}}
         if mode == "hold":
             decision, epochs = "hold", 0
         elif round_index <= 2:
@@ -117,10 +121,11 @@ def _prefix_rows(path: Path, keep: int) -> list[str]:
 
 def run(dataset: str, rounds: int, *, docker: bool = False, image: str = "zhixun-rsi-harness:0.2",
         grow: bool = False, stage_every: int = 2, max_train_rows: int = 0,
-        timeout: int = 900, stub_mode: str = "train") -> int:
+        timeout: int = 900, stub_mode: str = "train", save_selected: Path | None = None,
+        package_dir: Path | None = None) -> int:
     package = dict(DATASETS[dataset])
     package["key"] = dataset
-    source = package["package"]
+    source = package_dir or package["package"]
     tmp = Path(tempfile.mkdtemp(prefix=f"harness-local-{dataset}-"))
     data = tmp / "data"
     data.mkdir()
@@ -218,7 +223,7 @@ def run(dataset: str, rounds: int, *, docker: bool = False, image: str = "zhixun
             "validation_metrics": {metric_name: state.get("last", 0.0)},
         })
         print("selected:", selected, "| state:", {key: state.get(key) for key in
-              ("metric", "best", "last", "last_gain", "stalled", "updates", "promotions")})
+              ("metric", "best", "last", "last_gain", "stalled", "updates", "promotions", "requested_epochs_total")})
 
         if selected != parent_id:
             candidate = tmp / "workspace" / f"candidate-round-{k}" / "checkpoint.npz"
@@ -255,6 +260,9 @@ def run(dataset: str, rounds: int, *, docker: bool = False, image: str = "zhixun
     if not ok:
         print("TEMP:", tmp)
     else:
+        if save_selected is not None:
+            save_selected.parent.mkdir(exist_ok=True, parents=True)
+            shutil.copyfile(parent_dir / "checkpoint.npz", save_selected)
         shutil.rmtree(tmp, ignore_errors=True)
     return 0 if ok else 1
 
@@ -262,6 +270,7 @@ def run(dataset: str, rounds: int, *, docker: bool = False, image: str = "zhixun
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="A", choices=sorted(DATASETS))
+    parser.add_argument("--package", type=Path, help="official dataset package (overrides data/raw/official_*)")
     parser.add_argument("--rounds", type=int, default=2)
     parser.add_argument("--grow", action="store_true", help="grow the training file each round")
     parser.add_argument("--stage-every", type=int, default=2)
@@ -269,9 +278,10 @@ if __name__ == "__main__":
     parser.add_argument("--docker", action="store_true", help="run inside the harness image")
     parser.add_argument("--image", default="zhixun-rsi-harness:0.2")
     parser.add_argument("--timeout", type=int, default=900)
-    parser.add_argument("--stub", default="train", choices=("train", "hold"))
+    parser.add_argument("--stub", default="train", choices=("train", "hold", "empty"))
+    parser.add_argument("--save-selected", type=Path, help="copy the final selected checkpoint after a successful rehearsal")
     args = parser.parse_args()
     raise SystemExit(run(args.dataset, args.rounds, docker=args.docker, image=args.image,
                          grow=args.grow, stage_every=args.stage_every,
                          max_train_rows=args.max_train_rows, timeout=args.timeout,
-                         stub_mode=args.stub))
+                         stub_mode=args.stub, save_selected=args.save_selected, package_dir=args.package))
