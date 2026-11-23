@@ -41,7 +41,6 @@ REG_ACCEPT_TOL = 0.0          # relative RMSE must not increase either
 CLASS_MIN_GAIN = 0.002        # a promotion must gain at least this much F1
 REG_MIN_GAIN = 0.002          # ... or 0.2% relative RMSE
 STALL_LIMIT = 2               # two fruitless updates in a row -> stop spending
-C_RUL_CAP = 145.0             # C-MAPSS last-cycle RUL; caps the exp() penalty tail
 
 # --- epoch caps per dataset (measured on the v1 trial) ------------------
 EPOCH_CAP = {"A": 5, "B": 4, "C": 3}
@@ -259,9 +258,6 @@ def parse_verdict(text: str) -> dict | None:
 def summarise_history(records, state: dict, task: str) -> dict:
     """Turn platform history + native state into the few numbers we act on."""
     points: list[dict] = []
-    baseline = state.get("baseline")
-    first_round = records[0].get("round_index") if records and isinstance(records[0], dict) else None
-    previous_value = _finite(baseline, 0.0) if baseline is not None and first_round in (1, None) else None
     for record in records or []:
         if not isinstance(record, dict):
             continue
@@ -271,19 +267,18 @@ def summarise_history(records, state: dict, task: str) -> dict:
             candidates = record.get("candidates") or []
             if candidates and isinstance(candidates[0], dict):
                 metrics = candidates[0].get("validation_metrics") or {}
-        name, value, higher = metric_value(task, metrics)
-        gain = None
-        if previous_value is not None:
-            gain = (value - previous_value) if higher else (previous_value - value) / max(abs(previous_value), _EPS)
+        name, _, _ = metric_value(task, metrics)
+        value = _finite(metrics.get(name), float("nan"))
+        # The submitting harness measured gain on one holdout. Scores from
+        # adjacent stages or from different serving policies are not paired.
+        gain = _finite(configuration.get("gain"), float("nan"))
         points.append({
             "round": record.get("round_index"),
             "decision": record.get("decision", ""),
             "epochs": int(_finite(configuration.get("epochs"), 0.0)),
-            "gain": None if gain is None else round(float(gain), 6),
-            "value": round(float(value), 6) if value else None,
+            "gain": round(gain, 6) if math.isfinite(gain) else None,
+            "value": round(value, 6) if math.isfinite(value) else None,
         })
-        if value:
-            previous_value = value
 
     native = state.get("decisions") if isinstance(state.get("decisions"), list) else []
     if not points and native:
@@ -470,18 +465,8 @@ def acceptance(before: dict, after: dict, task: str) -> dict:
 
 
 def clip_regression_prediction(value: float, feature_count: int) -> float:
-    """Non-negative RUL, with the C-MAPSS last-cycle ceiling.
-
-    v1's C task produced a NASA score of 8.85e10: the asymmetric score is
-    ``exp(-d/13)-1`` for under-prediction, so a single ~200-cycle over-prediction
-    dominates everything. The hidden C samples are scored on the last observed
-    cycle and their true RUL does not exceed ~145, so values above that are
-    pure tail risk. The cap is applied only to the 24-feature task.
-    """
-    result = max(0.0, float(value))
-    if int(feature_count) == 24:
-        result = min(result, C_RUL_CAP)
-    return result
+    """Return a non-negative remaining-life estimate in the original unit."""
+    return max(0.0, float(value))
 
 
 def decision_record(*, round_index: int, stage_id: str, dataset_key: str,

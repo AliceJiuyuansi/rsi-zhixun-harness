@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.harness.guard import Gatekeeper  # noqa: E402
+from src.harness.killswitch import KillSwitch  # noqa: E402
 from src.harness.round_controller import (  # noqa: E402
     acceptance,
     apply_verdict,
@@ -29,6 +31,7 @@ from src.harness.round_controller import (  # noqa: E402
     score_gap,
     summarise_history,
 )
+from src.schema import Action, GateDecision  # noqa: E402
 
 
 class ProfileTests(unittest.TestCase):
@@ -101,6 +104,29 @@ class HistoryTests(unittest.TestCase):
         digest = summarise_history([], state, "classification")
         self.assertEqual(digest["stalled"], 1)
         self.assertAlmostEqual(digest["last_gain"], 0.01)
+
+    def test_paired_history_uses_recorded_gain(self):
+        # v3 C round 1 was +0.009805 on the paired holdout, but differencing
+        # the platform's post-cap validation scores produced -0.10701.
+        records = [
+            {"round_index": 1, "decision": "promote",
+             "configuration": {"epochs": 3, "gain": 0.009805},
+             "validation_metrics": {"rmse": 58.526016}},
+            {"round_index": 2, "decision": "promote",
+             "configuration": {"epochs": 3, "gain": 0.003823},
+             "validation_metrics": {"rmse": 58.311335}},
+        ]
+        digest = summarise_history(records, {}, "regression")
+        self.assertEqual([point["gain"] for point in digest["recent"]],
+                         [0.009805, 0.003823])
+        self.assertIn("0.009805", digest["evidence"])
+
+    def test_missing_recorded_gain_stays_unknown(self):
+        records = [{"round_index": 1, "decision": "retain",
+                    "configuration": {"epochs": 1},
+                    "validation_metrics": {"macro_f1": 0.70}}]
+        digest = summarise_history(records, {}, "classification")
+        self.assertIsNone(digest["recent"][0]["gain"])
 
 
 class BudgetTests(unittest.TestCase):
@@ -184,8 +210,8 @@ class AcceptanceTests(unittest.TestCase):
         self.assertFalse(worse["accepted"])      # "not worse" is strict
         self.assertFalse(worse["promote"])
 
-    def test_c_task_prediction_is_capped(self):
-        self.assertEqual(clip_regression_prediction(300.0, 24), 145.0)
+    def test_remaining_life_has_no_upper_cap(self):
+        self.assertEqual(clip_regression_prediction(300.0, 24), 300.0)
         self.assertEqual(clip_regression_prediction(120.0, 24), 120.0)
         self.assertEqual(clip_regression_prediction(300.0, 34), 300.0)
         self.assertEqual(clip_regression_prediction(-5.0, 34), 0.0)
@@ -194,6 +220,31 @@ class AcceptanceTests(unittest.TestCase):
         name, value, higher = metric_value("regression", {"rmse": 50.0})
         self.assertEqual((name, value, higher), ("rmse", 50.0, False))
         self.assertAlmostEqual(score_gap(50.0, 55.0, False), 0.10)
+
+
+class CrossRoundFuseTests(unittest.TestCase):
+    def test_three_failures_latch_across_rounds(self):
+        kill = KillSwitch({"policy": {"max_consecutive_failures": 3}})
+        for _ in range(3):
+            kill.note_step_error("boom")
+        self.assertTrue(kill.tripped())
+        saved = kill.as_dict()
+
+        restored = KillSwitch({"policy": {"max_consecutive_failures": 3}})
+        restored.consecutive_failures = int(saved["consecutive_failures"])
+        restored.total_failures = int(saved["total_failures"])
+        restored.stopped = True
+        restored.reason = saved["reason"] or "latched in a prior round"
+
+        gate = Gatekeeper(cfg={"policy": {"max_retrains": 10,
+                                          "max_consecutive_failures": 3}},
+                          kill=restored, executable=("none", "finetune"))
+        decision = gate.review(
+            GateDecision(True, "try again", Action("finetune", {"epochs": 1, "lr": 1e-3})),
+            step=4, retrains=3)
+        self.assertFalse(decision.approved)
+        self.assertEqual(decision.action.kind, "none")
+        self.assertIn("kill-switch", decision.reason)
 
 
 if __name__ == "__main__":

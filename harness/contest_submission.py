@@ -236,6 +236,12 @@ def train(rnd) -> None:
         cfg={"policy": {"max_retrains": MAX_UPDATES, "max_retrains_per_window": 0,
                         "amplitude_factor": 2.0, "max_consecutive_failures": 3}},
         audit=audit, root=WORKSPACE, executable=("none", "finetune"))
+    old_kill = previous_state.get("kill_state") or {}
+    gate.kill.consecutive_failures = int(old_kill.get("consecutive_failures", 0))
+    gate.kill.total_failures = int(old_kill.get("total_failures", 0))
+    if previous_state.get("kill_switch"):
+        gate.kill.stopped = True
+        gate.kill.reason = old_kill.get("reason") or "latched in a prior round"
     gate.limiter.last = dict(previous_state.get("bounds") or {})
     gate.budget.steps = [int(item) for item in (previous_state.get("budget_steps") or [])
                          if isinstance(item, (int, float))]
@@ -280,10 +286,12 @@ def train(rnd) -> None:
                                           ensure_ascii=False))
             outcome = acceptance(round_result.metrics_before, round_result.metrics_after, task)
             gate.commit(gated.action, step=int(rnd.round_index))
+            gate.note_step_ok()
             audit.write("round_result", step=int(rnd.round_index), rule=decision["rule"],
                         epochs=decision["epochs"], outcome=outcome,
                         metrics_after=round_result.metrics_after)
         except Exception as exc:  # noqa: BLE001 - degradation is part of the contract
+            gate.note_step_error(exc)
             training_error = f"{type(exc).__name__}: {exc}"
             log_to_stderr(f"training failed, keeping the parent model: {training_error}")
             shutil.rmtree(candidate_dir, ignore_errors=True)
@@ -397,6 +405,7 @@ def train(rnd) -> None:
         "bounds": gate.limiter.as_dict(),
         "budget_steps": list(gate.budget.steps),
         "kill_switch": bool(gate.kill.tripped()),
+        "kill_state": gate.kill.as_dict(),
         "audit": audit.as_dict(),
         "audit_events": list(audit.events[-20:]),
         "decisions": records,
