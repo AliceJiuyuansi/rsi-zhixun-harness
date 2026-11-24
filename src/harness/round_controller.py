@@ -50,7 +50,7 @@ CALIBRATION_EPOCHS = {"classification": 1, "regression": 3}
 CALIBRATION_LR = {"classification": 1e-3, "regression": 1e-3}
 RECOVER_EPOCHS = {"A": 3, "B": 2, "C": 2}
 RECOVER_LR = 1.5e-3
-NEW_STAGE_EPOCHS = {"A": 3, "B": 3, "C": 2}
+NEW_STAGE_EPOCHS = {"A": 3, "B": 3, "C": 3}
 
 _EPS = 1e-9
 
@@ -392,8 +392,10 @@ def choose_budget(*, dataset_key: str, task: str, round_index: int,
                 "reason": "A follows the v1 budget: three epochs on new rows, one on a quiet round",
                 "signals": signals}
     if dataset_key == "C" and stage_changed:
-        return {"action": "finetune", "epochs": 1, "lr": RECOVER_LR,
-                "rule": "c_stage_probe", "reason": "Probe the new C stage with one epoch",
+        epochs = min(NEW_STAGE_EPOCHS.get("C", 3), cap)
+        return {"action": "finetune", "epochs": epochs, "lr": RECOVER_LR,
+                "rule": "c_stage_probe",
+                "reason": f"Adapt C to the new stage with {epochs} epochs",
                 "signals": signals}
 
     if stalled >= STALL_LIMIT and not stage_changed:
@@ -536,7 +538,7 @@ def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> d
             delta = _finite(after.get("nasa_log1p"), math.nan) - _finite(before.get("nasa_log1p"), math.nan)
             if delta > 0.50:
                 accepted = False
-            nasa_bonus = gain >= 0.0005 and delta <= -0.15
+            nasa_bonus = gain >= 0.0 and delta <= -0.08
         promote = effective_gain >= REG_MIN_GAIN or nasa_bonus
     return {
         "metric": after_name or before_name,

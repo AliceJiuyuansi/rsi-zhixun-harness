@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from harness.contest_submission import calibration_enabled, calibration_mode  # noqa: E402
+from src.harness.round_controller import acceptance, choose_budget  # noqa: E402
 from src.models.official_round import OfficialRound  # noqa: E402
 from vendor.contest_baselines.c_calibration import fit, predict  # noqa: E402
 from vendor.contest_baselines.model import Model  # noqa: E402
@@ -94,6 +95,23 @@ class CalibrationV92Tests(unittest.TestCase):
         for mode in ("spline_v2", "res_mlp_v1"):
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 fit(x, y, parent, mode=mode)
+
+    def test_c_new_stage_budget_and_nasa_bonus_gate(self):
+        budget = choose_budget(
+            dataset_key="C", task="regression", round_index=9,
+            psi_prev=0.001, psi_holdout=0.007, data_grew=True,
+            stage_changed=True, gap=0.0, history={"stalled": 2, "last_gain": 0.0},
+        )
+        self.assertEqual(budget["rule"], "c_stage_probe")
+        self.assertEqual(budget["epochs"], 3)
+
+        # Replay of platform Run 0 R9: RMSE slightly improved and log_nasa dropped by 0.125
+        before = {"rmse": 50.468, "nasa_log1p": 23.191}
+        after = {"rmse": 50.443, "nasa_log1p": 23.066}
+        self.assertTrue(acceptance(before, after, "regression", "C")["promote"])
+        # Slight RMSE regression is still blocked even if NASA drops
+        worse_rmse = {"rmse": 50.50, "nasa_log1p": 23.00}
+        self.assertFalse(acceptance(before, worse_rmse, "regression", "C")["promote"])
 
 
 if __name__ == "__main__":

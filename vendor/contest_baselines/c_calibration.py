@@ -88,7 +88,7 @@ def _best_shift_asym(parent, correction, y, neg_clip, pos_clip,
     log_denom = max(log_nasa0, 0.0)
     best_obj = 1.0 + nasa_alpha * np.exp(log_nasa0 - log_denom)
     best_shift, best_rmse, best_log_nasa = 0.0, rmse0, log_nasa0
-    for delta in np.linspace(shift_lo, shift_hi, 49):
+    for delta in np.linspace(shift_lo, shift_hi, 25):
         if delta == 0.0:
             continue
         rmse, log_nasa = _metrics(_corrected(parent, correction, delta, neg_clip, pos_clip) - y)
@@ -216,7 +216,9 @@ def _fit_spline_v2(x, y, parent_prediction):
 def _fit_res_mlp_v1(x, y, parent_prediction):
     hidden = (32, 16)
     epochs, lr, wd, bs = 10, 7e-3, 8e-4, 4096
-    gamma, nasa_w, nasa_scale, t_cap, over_boost = 0.55, 0.50, 2.3, 22.0, 1.65
+    # over_boost=1.15 avoids v8/v9's downward-bias blowup on hidden under-prediction tails
+    # while keeping a mild guard on over-predictions (validated on VAL + 3-fold engine OOF).
+    gamma, nasa_w, nasa_scale, t_cap, over_boost = 0.55, 0.50, 2.3, 22.0, 1.15
     neg_clip, pos_clip = 120.0, 42.0
 
     conditions = np.rint(x[:, 21])

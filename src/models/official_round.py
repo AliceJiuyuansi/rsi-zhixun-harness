@@ -234,16 +234,28 @@ class OfficialRound:
         epochs_without_progress = 0
         epochs_run = 0
         parent_weights = {k: model.params[k].copy() for k in PARAMETERS} if smooth_weights else None
-        for _ in range(int(epochs)):
+        total_epochs = int(epochs)
+        best_raw_rmse = float("inf")
+        for ep_idx in range(total_epochs):
             with measured("fit"):
                 loss = model.fit(X_train, np.asarray(y_train), 1)[0]
             epochs_run += 1
             if calibrate_c:
-                try:
-                    with measured("calibration"):
-                        _refit_c(model, X_train, y_train, mode=calibration_mode)
-                except Exception:  # noqa: BLE001 - calibration is optional; keep training
+                should_refit = True
+                if calibration_mode != "v8" and total_epochs > 1:
+                    # Skip expensive non-v8 refit on clearly degraded middle epochs.
                     model.meta.pop("c_calibration", None)
+                    raw_rmse = regression_metrics(y_val, model.predict(X_val))["rmse"]
+                    if ep_idx == 0 or ep_idx == total_epochs - 1 or raw_rmse <= best_raw_rmse * 1.005:
+                        best_raw_rmse = min(best_raw_rmse, raw_rmse)
+                    else:
+                        should_refit = False
+                if should_refit:
+                    try:
+                        with measured("calibration"):
+                            _refit_c(model, X_train, y_train, mode=calibration_mode)
+                    except Exception:  # noqa: BLE001 - calibration is optional; keep training
+                        model.meta.pop("c_calibration", None)
             with measured("validation"):
                 validation = self.evaluate(model, X_val, y_val, groups=validation_groups)
             ok = eligible(validation)
