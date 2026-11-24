@@ -548,6 +548,20 @@ def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> d
     }
 
 
+def paired_acceptance(before: dict, after: dict, task: str, dataset_key: str) -> dict:
+    """Candidate policy: compare only paired scores on the current holdout."""
+    result = acceptance(before, after, task, dataset_key)
+    primary = "macro_f1" if dataset_key == "A" else "rmse"
+    required = (primary, "nasa_log1p") if dataset_key == "C" else (primary,)
+    if any(not math.isfinite(_finite(m.get(k), math.nan)) for m in (before, after) for k in required):
+        result.update(accepted=False, promote=False, reason="missing_paired_metrics")
+    elif dataset_key == "A":
+        # Compare the unrounded values: a tie may advance, a real loss may not.
+        noninferior = after[primary] >= before[primary] - 1e-9
+        result.update(accepted=bool(noninferior), promote=bool(noninferior))
+    return result
+
+
 def clip_regression_prediction(value: float, feature_count: int) -> float:
     """Return a non-negative remaining-life estimate in the original unit."""
     return max(0.0, float(value))
