@@ -1,0 +1,303 @@
+{
+  "source": "bb0a7f8b88c07c0eace93202de8861ecb9cf26f6",
+  "task": "B",
+  "sdk": "1.0.4",
+  "protocol": "Fixed published starting checkpoint; local ten-round 40%-100% train growth, stage every three rounds; empty verdict; full public validation. Cap is applied equally at selection and serving.",
+  "data_hashes": {
+    "public\\validation.jsonl": "23673a66bc22a166bf2f47b18f9c9d594f7e66a9aad88ddbccbcaea2310d9eb3",
+    "public\\train.jsonl": "71b2663fffd3d7ef6dca8a7b3feb31c3feb96c57f385335d03041a5fa431054a",
+    "checkpoint.npz": "c7d819fcee9d25459c583b5ffdb35593d4a47b524ed152d0226bf81a283314b4"
+  },
+  "platform": {
+    "v5": {
+      "record_sha256": "42076ba5c3ac3a74d8fcc491ac9ae299481d4a25cc0fba0de07ab3557009e215",
+      "hidden_rmse": 352.08292078326355,
+      "epochs": [
+        5,
+        3,
+        3,
+        0,
+        4,
+        0,
+        0,
+        4,
+        3,
+        3
+      ],
+      "round8": {
+        "epochs": 4.0,
+        "lr": 0.0015,
+        "gain": 0.003297,
+        "promoted": true
+      },
+      "promotions": [
+        1,
+        2,
+        8,
+        9
+      ]
+    },
+    "v6": {
+      "record_sha256": "0c2c13d0a1d2269233366594b7d8b6a6c53ca67577cad25385761b9bf3875483",
+      "hidden_rmse": 569.0462418071775,
+      "epochs": [
+        5,
+        3,
+        3,
+        0,
+        4,
+        0,
+        0,
+        4,
+        0,
+        0
+      ],
+      "round8": {
+        "epochs": 4.0,
+        "lr": 0.0015,
+        "gain": -0.000991,
+        "promoted": false
+      },
+      "promotions": [
+        1,
+        2
+      ]
+    }
+  },
+  "comparisons": [
+    {
+      "mode": "policy",
+      "prediction_cap": 1200,
+      "budget": "v6",
+      "epochs": [
+        5,
+        4,
+        4,
+        4,
+        1,
+        1,
+        2,
+        1,
+        1,
+        2
+      ],
+      "epochs_total": 25,
+      "promotions": [
+        1
+      ],
+      "selected_public_rmse_by_round": [
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422
+      ],
+      "n": 1679,
+      "rmse": 649.239422142579,
+      "mae": 541.3760773477721,
+      "clipped": 3,
+      "predictions_sha256": "21fa76cbfdecdd399b4b34b85d3c4fb0151c5f4f11fa9b19edf59b48180daf1d",
+      "checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78"
+    },
+    {
+      "mode": "policy",
+      "prediction_cap": 1200,
+      "budget": "v5",
+      "epochs": [
+        5,
+        4,
+        4,
+        4,
+        1,
+        1,
+        2,
+        1,
+        1,
+        2
+      ],
+      "epochs_total": 25,
+      "promotions": [
+        1
+      ],
+      "selected_public_rmse_by_round": [
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422
+      ],
+      "n": 1679,
+      "rmse": 649.239422142579,
+      "mae": 541.3760773477721,
+      "clipped": 3,
+      "predictions_sha256": "21fa76cbfdecdd399b4b34b85d3c4fb0151c5f4f11fa9b19edf59b48180daf1d",
+      "checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78"
+    },
+    {
+      "mode": "policy",
+      "prediction_cap": 2500,
+      "budget": "v6",
+      "epochs": [
+        5,
+        4,
+        4,
+        4,
+        1,
+        1,
+        2,
+        1,
+        1,
+        2
+      ],
+      "epochs_total": 25,
+      "promotions": [
+        1
+      ],
+      "selected_public_rmse_by_round": [
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195
+      ],
+      "n": 1679,
+      "rmse": 649.6351950101174,
+      "mae": 541.6890217855195,
+      "clipped": 0,
+      "predictions_sha256": "17e520551a2a1e19b6830b85d938c50ad5334fa22a7d3739ad3d2161a76de0ea",
+      "checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78"
+    },
+    {
+      "mode": "policy",
+      "prediction_cap": 2500,
+      "budget": "v5",
+      "epochs": [
+        5,
+        4,
+        4,
+        4,
+        1,
+        1,
+        2,
+        1,
+        1,
+        2
+      ],
+      "epochs_total": 25,
+      "promotions": [
+        1
+      ],
+      "selected_public_rmse_by_round": [
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195,
+        649.635195
+      ],
+      "n": 1679,
+      "rmse": 649.6351950101174,
+      "mae": 541.6890217855195,
+      "clipped": 0,
+      "predictions_sha256": "17e520551a2a1e19b6830b85d938c50ad5334fa22a7d3739ad3d2161a76de0ea",
+      "checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78"
+    },
+    {
+      "mode": "recorded",
+      "prediction_cap": 1200,
+      "budget": "v6",
+      "epochs": [
+        5,
+        3,
+        3,
+        0,
+        4,
+        0,
+        0,
+        4,
+        0,
+        0
+      ],
+      "epochs_total": 19,
+      "promotions": [
+        1
+      ],
+      "selected_public_rmse_by_round": [
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422
+      ],
+      "n": 1679,
+      "rmse": 649.239422142579,
+      "mae": 541.3760773477721,
+      "clipped": 3,
+      "predictions_sha256": "21fa76cbfdecdd399b4b34b85d3c4fb0151c5f4f11fa9b19edf59b48180daf1d",
+      "checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78"
+    },
+    {
+      "mode": "recorded",
+      "prediction_cap": 1200,
+      "budget": "v5",
+      "epochs": [
+        5,
+        3,
+        3,
+        0,
+        4,
+        0,
+        0,
+        4,
+        3,
+        3
+      ],
+      "epochs_total": 25,
+      "promotions": [
+        1
+      ],
+      "selected_public_rmse_by_round": [
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422,
+        649.239422
+      ],
+      "n": 1679,
+      "rmse": 649.239422142579,
+      "mae": 541.3760773477721,
+      "clipped": 3,
+      "predictions_sha256": "21fa76cbfdecdd399b4b34b85d3c4fb0151c5f4f11fa9b19edf59b48180daf1d",
+      "checkpoint_sha256": "0296fd2fa6a9c854b95455ce32c18c7d0494083e92591e56294bdf35c03d9e78"
+    }
+  ]
+}
