@@ -64,6 +64,8 @@ class ReceiptTests(unittest.TestCase):
 
 class MetricsTests(unittest.TestCase):
     def test_calibration_override_can_disable_default(self):
+        self.assertTrue(submission.calibration_enabled("0.7.2"))
+        self.assertFalse(submission.calibration_enabled("0.7.2", "0"))
         self.assertTrue(submission.calibration_enabled("0.7.1"))
         self.assertFalse(submission.calibration_enabled("0.7.1", "0"))
         self.assertFalse(submission.calibration_enabled("0.7", "false"))

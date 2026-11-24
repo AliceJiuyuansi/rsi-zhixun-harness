@@ -65,13 +65,13 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 本地与镜像默认均采用 v7 策略；预测本身不再依赖发布环境变量。
-RELEASE = os.environ.get("RSI_RELEASE", "0.7.1")
+RELEASE = os.environ.get("RSI_RELEASE", "0.7.2")
 
 
 def calibration_enabled(release, override=None):
     """显式0/1优先；未指定时采用对应版本默认值。"""
     if override is None:
-        return release in ("0.7", "0.7.1")
+        return release in ("0.7", "0.7.1", "0.7.2")
     return override.strip().lower() not in ("0", "false", "no", "off", "")
 
 
@@ -242,9 +242,9 @@ def train(rnd) -> None:
     prior_spend = sum(int((r.get("configuration") or {}).get("epochs") or 0)
                       for r in (platform_history or []) if isinstance(r, dict))
     prior_spend = max(prior_spend, int(previous_state.get("requested_epochs_total", 0)))
-    task_limit = {"A": 28, "B": 25, "C": 13}.get(str(rnd.dataset_key))
-    if task_limit is not None and decision["epochs"] > max(0, task_limit - prior_spend):
-        remaining = max(0, task_limit - prior_spend)
+    # A uses the v6 cumulative limit. B and C follow the v5 per-round budgets.
+    remaining = max(0, 28 - prior_spend)
+    if rnd.dataset_key == "A" and decision["epochs"] > remaining:
         decision.update(epochs=remaining, action="finetune" if remaining else "none",
                         rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
     log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "

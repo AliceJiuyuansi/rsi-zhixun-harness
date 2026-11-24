@@ -6,7 +6,7 @@ checkpoint and the official public split, then exercises `predict`.
 
     python scripts/test_harness_local.py --dataset A --rounds 10
     python scripts/test_harness_local.py --dataset C --rounds 6 --max-train-rows 12000
-    python scripts/test_harness_local.py --dataset A --rounds 2 --docker --image zhixun-rsi-harness:0.2
+    python scripts/test_harness_local.py --dataset A --rounds 2 --docker --image zhixun-rsi-harness:0.7.2
 
 v2 additions:
   * A/B/C official packages (task + metric switch);
@@ -119,7 +119,7 @@ def _prefix_rows(path: Path, keep: int) -> list[str]:
     return lines[:max(32, keep)] if keep < len(lines) else lines
 
 
-def run(dataset: str, rounds: int, *, docker: bool = False, image: str = "zhixun-rsi-harness:0.2",
+def run(dataset: str, rounds: int, *, docker: bool = False, image: str = "zhixun-rsi-harness:0.7.2",
         grow: bool = False, stage_every: int = 2, max_train_rows: int = 0,
         timeout: int = 900, stub_mode: str = "train", save_selected: Path | None = None,
         package_dir: Path | None = None) -> int:
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     parser.add_argument("--stage-every", type=int, default=2)
     parser.add_argument("--max-train-rows", type=int, default=0)
     parser.add_argument("--docker", action="store_true", help="run inside the harness image")
-    parser.add_argument("--image", default="zhixun-rsi-harness:0.2")
+    parser.add_argument("--image", default="zhixun-rsi-harness:0.7.2")
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--stub", default="train", choices=("train", "hold", "empty"))
     parser.add_argument("--save-selected", type=Path, help="copy the final selected checkpoint after a successful rehearsal")

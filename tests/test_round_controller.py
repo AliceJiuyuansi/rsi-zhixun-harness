@@ -144,6 +144,14 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(budget["epochs"], 0)
         self.assertEqual(budget["rule"], "stalled")
 
+    def test_c_stage_change_uses_v5_budget(self):
+        for psi, expected in ((0.01, 3), (0.6, 2)):
+            with self.subTest(psi=psi):
+                budget = choose_budget(dataset_key="C", task="regression", round_index=4,
+                                       psi_prev=psi, psi_holdout=0.01, data_grew=False,
+                                       stage_changed=True, gap=0.0, history={"stalled": 2})
+                self.assertEqual(budget["epochs"], expected)
+
     def test_new_stage_with_drift_gets_budget(self):
         budget = choose_budget(dataset_key="A", task="classification", round_index=5,
                                psi_prev=0.6, psi_holdout=0.2, data_grew=True,

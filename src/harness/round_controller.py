@@ -352,10 +352,6 @@ def choose_budget(*, dataset_key: str, task: str, round_index: int,
                 "rule": "a_v1_fresh" if data_grew else "a_v1_quiet",
                 "reason": "A follows the v1 budget: three epochs on new rows, one on a quiet round",
                 "signals": signals}
-    if dataset_key == "C" and stage_changed:
-        return {"action": "finetune", "epochs": 1, "lr": RECOVER_LR,
-                "rule": "c_stage_probe", "reason": "Probe the new C stage with one epoch",
-                "signals": signals}
 
     if stalled >= STALL_LIMIT and not stage_changed:
         if data_grew:

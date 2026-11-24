@@ -1,0 +1,11 @@
+# Local SDK rehearsal with the official public split.
+reference: f28fcd9
+candidate: "0.7.2"
+datasets: [A, B, C]
+train_order: [original, 7, 42]
+validation_order: original
+rounds: 10
+grow: true
+stage_every: 3
+model_stub: empty
+metrics: [macro_f1, rmse, nasa, per_row_prediction_sha256, selected_rounds]
