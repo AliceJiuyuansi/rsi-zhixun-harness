@@ -1,0 +1,12 @@
+{
+  "method": "paper_dw",
+  "threshold_cycles": 10.0,
+  "weight_cap_cycles": 100.0,
+  "ridge_strength": 0.001,
+  "correction_limit_cycles": 20.0,
+  "optimization_steps": 40,
+  "rmse_relative_tolerance": 0.01,
+  "nasa_min_relative_gain": 0.10,
+  "source_doi": "10.3390/s20030723",
+  "scope": "train-only bounded residual adaptation; not a full paper reproduction"
+}

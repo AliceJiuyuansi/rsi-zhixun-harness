@@ -51,11 +51,12 @@ from src.harness.round_controller import (  # noqa: E402
     summarise_history,
 )
 from src.models.official_round import OfficialRound  # noqa: E402
+from src.models.calibration_policy import load_calibration_options, load_c_selection_policy  # noqa: E402
 from src.policy.whitelist import NONE_ACTION  # noqa: E402
 from src.schema import Action, GateDecision  # noqa: E402
 from src.utils.audit import AuditLog  # noqa: E402
 from vendor.contest_baselines.data import flatten, read_dataset  # noqa: E402
-from vendor.contest_baselines.model import Model  # noqa: E402
+from vendor.contest_baselines.model import Model, checkpoint_digest  # noqa: E402
 
 SUPPORTED_TASKS = ("classification", "regression")
 HARNESS_ENTRY = os.environ.get("CONTEST_HARNESS", str(PLATFORM_APP_DIR / "harness.py"))
@@ -65,13 +66,13 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 本地与镜像默认均采用 v7 策略；预测本身不再依赖发布环境变量。
-RELEASE = os.environ.get("RSI_RELEASE", "0.7.1")
+RELEASE = os.environ.get("RSI_RELEASE", "0.7.2")
 
 
 def calibration_enabled(release, override=None):
     """显式0/1优先；未指定时采用对应版本默认值。"""
     if override is None:
-        return release in ("0.7", "0.7.1")
+        return release in ("0.7", "0.7.1", "0.7.2")
     return override.strip().lower() not in ("0", "false", "no", "off", "")
 
 
@@ -180,6 +181,18 @@ def train(rnd) -> None:
     validation_groups = validation_dataset["groups"] if rnd.dataset_key == "B" else None
     validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
                                          validation_dataset["y"], groups=validation_groups)
+    c_anchor_checkpoint = None
+    c_anchor_rmse = None
+    c_policy = None
+    if rnd.dataset_key == "C" and task == "regression":
+        c_policy = load_c_selection_policy()
+        saved_anchor = STATE_DIR / "c_rmse_anchor.npz"
+        c_anchor_checkpoint = saved_anchor if saved_anchor.is_file() else parent_checkpoint
+        anchor_model = Model.load(str(c_anchor_checkpoint))
+        anchor_metrics = trainer.evaluate(anchor_model, validation_dataset["x"], validation_dataset["y"])
+        c_anchor_rmse = float(anchor_metrics["rmse"])
+        if float(validation_before["rmse"]) < c_anchor_rmse:
+            c_anchor_checkpoint, c_anchor_rmse = parent_checkpoint, float(validation_before["rmse"])
     metric_state = _metric_state(previous_state, validation_before, task)
 
     # --- 3. drift: against last stage, against round 1, and train vs val --
@@ -307,12 +320,19 @@ def train(rnd) -> None:
                 patience=EARLY_STOP_PATIENCE,
                 calibrate_c=calibrate_c,
                 validation_groups=validation_groups,
+                calibration_options=load_calibration_options() if calibrate_c else None,
+                c_reference_rmse=c_anchor_rmse,
+                c_selection_policy=c_policy,
                 stage_id=stage_id or f"round-{rnd.round_index}",
                 hypothesis=decision["reason"],
                 change_summary=json.dumps({"rule": decision["rule"],
                                            "signals": decision["signals"]},
                                           ensure_ascii=False))
-            outcome = acceptance(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key))
+            outcome = acceptance(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key),
+                                 c_reference_rmse=c_anchor_rmse, c_policy=c_policy)
+            if outcome.get("nasa_gate", {}).get("passed") is False:
+                log_to_stderr(f"reject_nasa: {outcome['nasa_gate']}; keeping parent")
+                audit.write("reject_nasa", step=int(rnd.round_index), **outcome["nasa_gate"])
             gate.commit(gated.action, step=int(rnd.round_index))
             gate.note_step_ok()
             audit.write("round_result", step=int(rnd.round_index), rule=decision["rule"],
@@ -336,6 +356,8 @@ def train(rnd) -> None:
                             PLATFORM_APP_DIR / "src/harness/round_controller.py",
                             PLATFORM_APP_DIR / "src/harness/model_receipt.py",
                             PLATFORM_APP_DIR / "src/models/official_round.py",
+                            PLATFORM_APP_DIR / "src/models/calibration_policy.py",
+                            PLATFORM_APP_DIR / "src/models/c_selection.py",
                             PLATFORM_APP_DIR / "vendor/contest_baselines/model.py",
                             PLATFORM_APP_DIR / "vendor/contest_baselines/data.py",
                             PLATFORM_APP_DIR / "vendor/contest_baselines/c_calibration.py"):
@@ -352,7 +374,9 @@ def train(rnd) -> None:
                            "psi_holdout": round(psi_holdout, 4), "pred_js": round(pred_js, 4),
                            "history": history["recent"], "model_action": decision.get("model_action"),
                            "gain": outcome["gain"], "accepted": outcome["accepted"],
+                           "policy_gain": outcome.get("policy_gain", outcome["gain"]),
                            "calibrate_c": bool(round_result.config.get("calibrate_c")),
+                           "calibration_options": round_result.config.get("calibration_options", {}),
                            "promoted": True, "rows": train_rows},
             seed=int(parent_model.meta["seed"]),
             checkpoint_paths=["checkpoint.npz"],
@@ -377,7 +401,7 @@ def train(rnd) -> None:
 
     if promoted:
         stalled = 0
-        last_gain = float(outcome["gain"])
+        last_gain = float(outcome.get("policy_gain", outcome["gain"]))
         last_rejected = False
         promotions = int(previous_state.get("promotions", 0)) + 1
     elif int(decision["epochs"]) > 0:
@@ -455,6 +479,15 @@ def train(rnd) -> None:
     next_round_state_dir = WORKSPACE / f"state-round-{rnd.round_index}"
     shutil.rmtree(next_round_state_dir, ignore_errors=True)
     next_round_state_dir.mkdir(parents=True, exist_ok=True)
+    if c_anchor_checkpoint is not None:
+        reference_used_rmse = c_anchor_rmse
+        if promoted and float(final_metrics["rmse"]) < c_anchor_rmse:
+            c_anchor_checkpoint, c_anchor_rmse = round_result.checkpoint, float(final_metrics["rmse"])
+        shutil.copyfile(c_anchor_checkpoint, next_round_state_dir / "c_rmse_anchor.npz")
+        next_state["c_reference"] = {"checkpoint_sha256": checkpoint_digest(c_anchor_checkpoint),
+                                    "rmse_on_current_validation": c_anchor_rmse,
+                                    "reference_used_rmse": reference_used_rmse,
+                                    "validation_sha256": validation_dataset["sha256"], **c_policy}
     (next_round_state_dir / "harness_state.json").write_text(
         json.dumps(next_state, ensure_ascii=False, indent=1, allow_nan=False), encoding="utf-8")
     (next_round_state_dir / "decisions.jsonl").write_text(
@@ -466,6 +499,8 @@ def train(rnd) -> None:
     after_text = (f"{final_metric_state['metric']} {outcome['before']}→{outcome['after']} "
                   f"gain={outcome['gain']:+.4f}" if outcome else
                   f"{final_metric_state['metric']} 保持 {metric_state['before']:.4f}")
+    if outcome and "c_risk" in outcome:
+        after_text += f"；NASA相对收益={outcome['c_risk']['nasa_gain']:+.3%} RMSE上限={outcome['c_risk']['rmse_cap']:.6f}"
     reason = (
         f"第{rnd.round_index}轮（{stage_id or 'unknown-stage'}）：{decision['reason']}。"
         f"历史：{history['evidence']}。"
@@ -495,7 +530,9 @@ def train(rnd) -> None:
                        "release": RELEASE, "prediction_policy": "nonnegative_unbounded",
                        "accepted": bool(outcome and outcome.get("accepted")),
                        "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
+                       "calibration_options": round_result.config.get("calibration_options", {}) if round_result else {},
                        "promoted": promoted, "gain": None if not outcome else outcome["gain"],
+                       "policy_gain": None if not outcome else outcome.get("policy_gain", outcome["gain"]),
                        "gate": gated.approved},
         seed=int(parent_model.meta["seed"]),
         history_ids=list(rnd.history_ids)[:50],

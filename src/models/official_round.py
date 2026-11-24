@@ -18,6 +18,7 @@ The vendored copy of the official package lives in `vendor/contest_baselines/`
 from __future__ import annotations
 
 import json
+import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,6 +26,7 @@ from pathlib import Path
 import numpy as np
 
 from vendor.contest_baselines.model import Model, checkpoint_digest
+from src.models.c_selection import c_candidate_decision
 
 REPORT_FORMAT = "contest.cpu-baseline-report.v1"
 
@@ -61,13 +63,21 @@ def nasa_metrics(y_true, y_pred) -> dict:
     values = exponent[positive]
     log_terms[positive] = values + np.log(-np.expm1(-values))
     if not np.any(positive):
-        return {"nasa": 0.0, "nasa_log1p": 0.0, "nasa_saturated": False}
+        return {"nasa": 0.0, "nasa_log1p": 0.0, "nasa_saturated": False,
+                "nasa_rows": len(truth), "nasa_max_row": 0.0,
+                "nasa_max_row_signed_error": 0.0, "nasa_top_1pct_share": 0.0}
     peak = float(np.max(log_terms))
     log_sum = peak + float(np.log(np.exp(log_terms - peak).sum()))
     limit = float(np.log(np.finfo(float).max))
     saturated = log_sum >= limit
+    shares = np.exp(log_terms - log_sum)
+    tail_rows = max(1, int(np.ceil(len(truth) * .01)))
     return {"nasa": float(np.finfo(float).max) if saturated else float(np.exp(log_sum)),
-            "nasa_log1p": float(np.logaddexp(0.0, log_sum)), "nasa_saturated": saturated}
+            "nasa_log1p": float(np.logaddexp(0.0, log_sum)), "nasa_saturated": saturated,
+            "nasa_rows": len(truth),
+            "nasa_max_row": float(np.finfo(float).max) if peak >= limit else float(np.exp(peak)),
+            "nasa_max_row_signed_error": float(error[np.argmax(log_terms)]),
+            "nasa_top_1pct_share": float(np.partition(shares, len(shares)-tail_rows)[-tail_rows:].sum())}
 
 
 def grouped_regression_metrics(y_true, y_pred, groups) -> dict:
@@ -127,7 +137,8 @@ class RoundResult:
 class OfficialRound:
     """Thin, safe wrapper around the organiser's NumPy MLP checkpoint."""
 
-    def __init__(self, package_dir: str | Path | None = None):
+    def __init__(self, package_dir: str | Path | None = None, on_epoch=None):
+        self.on_epoch = on_epoch
         if package_dir is not None:  # allow an explicit copy (tests, other profiles)
             import sys
             sys.path.insert(0, str(Path(package_dir).resolve().parent))
@@ -153,6 +164,8 @@ class OfficialRound:
                        X_val, y_val, *, out_dir: str | Path, epochs: int = 3,
                        learning_rate: float | None = None, batch_size: int | None = None,
                        patience: int = 0, calibrate_c: bool = False, validation_groups=None,
+                       calibration_options: dict | None = None,
+                       c_reference_rmse=None, c_selection_policy=None,
                        stage_id: str = "round", hypothesis: str = "",
                        change_summary: str = "") -> RoundResult:
         """Continue the parent for up to `epochs`, keeping the best-scoring weights.
@@ -179,6 +192,8 @@ class OfficialRound:
             raise ValueError("validation features do not match the checkpoint schema")
 
         before = self.evaluate(model, X_val, y_val, groups=validation_groups)
+        protected_c = model.meta["task"] == "regression" and len(model.meta["paths"]) == 24
+        fit_options = dict(calibration_options or {"method": "ridge"})
         epochs_before = int(model.meta["epochs"])
         steps_before = int(model.meta["steps"])
         if learning_rate is not None:
@@ -191,9 +206,12 @@ class OfficialRound:
         out.mkdir(parents=True, exist_ok=False)  # every round owns a fresh directory
 
         history: list[dict] = []
-        best_score = float("-inf")
+        best_score = _primary_score(before) if protected_c else float("-inf")
         best_validation = before
         best_snapshot: Path | None = None
+        best_nasa_log = float(before.get("nasa_log1p", np.log1p(before.get("nasa", 0.))))
+        observed_best_rmse = float(before.get("rmse", float("inf")))
+        observed_best_nasa = best_nasa_log
         epochs_without_progress = 0
         epochs_run = 0
         for _ in range(int(epochs)):
@@ -204,18 +222,35 @@ class OfficialRound:
                 # Refit around this epoch's base prediction, never stack corrections.
                 model.meta.pop("c_calibration", None)
                 try:
-                    model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train))
-                except Exception:  # noqa: BLE001 - calibration is optional; keep training
+                    model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train), **fit_options)
+                    calibration_status = {"status": "fitted", "method": fit_options.get("method", "ridge"),
+                                          "fit": model.meta["c_calibration"].get("fit", {})}
+                except Exception as exc:  # noqa: BLE001 - calibration is optional; keep training
                     model.meta.pop("c_calibration", None)
+                    calibration_status = {"status": "failed", "error_type": type(exc).__name__}
+            else:
+                calibration_status = {"status": "not_requested"}
             validation = self.evaluate(model, X_val, y_val, groups=validation_groups)
+            c_decision = c_candidate_decision(before, validation, c_reference_rmse,
+                                             **(c_selection_policy or {})) if protected_c else None
+            nasa_gate = c_decision["nasa_gate"] if c_decision else None
             history.append({"epoch": int(model.meta["epochs"]), "step": int(model.meta["steps"]),
-                            "loss": float(loss), "validation": validation})
+                            "loss": float(loss), "validation": validation,
+                            "calibration": calibration_status, "nasa_gate": nasa_gate,
+                            "c_risk": c_decision})
+            if self.on_epoch is not None:
+                self.on_epoch(history[-1])
 
             score = _primary_score(validation)
-            if score > best_score + 1e-12:
+            current_nasa = float(validation.get("nasa_log1p", np.log1p(validation.get("nasa", 0.))))
+            better = ((current_nasa < best_nasa_log-1e-12 or
+                       (abs(current_nasa-best_nasa_log) <= 1e-12 and score > best_score+1e-12))
+                      and c_decision["promote"]) if protected_c else score > best_score+1e-12
+            if better:
                 # Snapshot the weights + Adam state that actually scored best, so
                 # "train longer" can never quietly hand back a worse model.
                 best_score = score
+                best_nasa_log = current_nasa
                 best_validation = validation
                 snapshot = out / f".snapshot-{epochs_run}.npz"
                 model.save(snapshot)
@@ -226,6 +261,14 @@ class OfficialRound:
             else:
                 epochs_without_progress += 1
 
+            if protected_c:
+                # 安全拒绝不等于优化停滞；任一目标仍进步就继续已获准的epoch。
+                progress = float(validation["rmse"]) < observed_best_rmse-1e-12 or current_nasa < observed_best_nasa-1e-12
+                if progress:
+                    epochs_without_progress = 0
+                observed_best_rmse = min(observed_best_rmse, float(validation["rmse"]))
+                observed_best_nasa = min(observed_best_nasa, current_nasa)
+
             if patience > 0 and epochs_without_progress >= patience:
                 break
 
@@ -233,7 +276,10 @@ class OfficialRound:
         checkpoint = out / "checkpoint.npz"
         if best_snapshot is not None:
             best_snapshot.replace(checkpoint)
-        else:  # no epochs ran (epochs=0 is rejected earlier, but stay safe)
+        elif protected_c:
+            # 训练尝试仍记录，但没有合格epoch时原样保留父检查点，绝不伪称训练产物。
+            shutil.copyfile(parent, checkpoint)
+        else:
             model.save(checkpoint)
         after = best_validation  # the saved checkpoint is the best-scoring snapshot
         selected_model = Model.load(str(checkpoint))
@@ -252,6 +298,11 @@ class OfficialRound:
                     "learning_rate": float(model.meta["learning_rate"]),
                     "batch_size": int(model.meta["batch_size"]),
                     "calibrate_c": bool(calibrate_c),
+                    "calibration_options": fit_options if calibrate_c else {},
+                    "selected_parent": bool(protected_c and best_snapshot is None),
+                    "c_selection": "nasa_first_with_persistent_rmse_reference" if protected_c else "primary_metric",
+                    "c_reference_rmse": c_reference_rmse,
+                    "c_selection_policy": c_selection_policy or {},
                     "stage_id": stage_id, "hypothesis": hypothesis,
                     "change_summary": change_summary},
         )
@@ -270,6 +321,10 @@ class OfficialRound:
                   "learning_rate": result.config["learning_rate"],
                   "batch_size": result.config["batch_size"],
                   "calibrate_c": bool(calibrate_c),
+                  "calibration_options": result.config["calibration_options"],
+                  "c_selection_policy": result.config["c_selection_policy"],
+                  "c_reference_rmse": c_reference_rmse,
+                  "selected_parent": result.config["selected_parent"],
                   "validation_before": before, "validation_after": after,
                   "hypothesis": hypothesis, "change_summary": change_summary}
         (out / "training.json").write_text(

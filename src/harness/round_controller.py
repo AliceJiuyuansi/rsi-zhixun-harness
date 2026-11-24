@@ -30,6 +30,7 @@ import re
 from typing import Any
 
 import numpy as np
+from src.models.c_selection import c_candidate_decision
 
 # --- drift bands (same semantics as src/policy/strategy.py) --------------
 PSI_STABLE = 0.10
@@ -272,7 +273,7 @@ def summarise_history(records, state: dict, task: str) -> dict:
         value = _finite(metrics.get(name), float("nan"))
         # The submitting harness measured gain on one holdout. Scores from
         # adjacent stages or from different serving policies are not paired.
-        gain = _finite(configuration.get("gain"), float("nan"))
+        gain = _finite(configuration.get("policy_gain", configuration.get("gain")), float("nan"))
         points.append({
             "round": record.get("round_index"),
             "decision": record.get("decision", ""),
@@ -454,7 +455,8 @@ def apply_verdict(budget: dict, verdict: dict | None, history: dict,
 
 
 # --------------------------------------------------------------- acceptance
-def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> dict:
+def acceptance(before: dict, after: dict, task: str, dataset_key: str = "", *,
+               c_reference_rmse=None, c_policy=None) -> dict:
     """Should the candidate replace the parent, and is the gain worth a upload?"""
     before_name, before_value, higher = metric_value(task, before)
     after_name, after_value, _ = metric_value(task, after)
@@ -471,6 +473,12 @@ def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> d
         gain = (before_value - after_value) / max(abs(before_value), _EPS)
         accepted = gain >= -1e-9
         promote = gain >= REG_MIN_GAIN
+    nasa_gate = None
+    c_decision = None
+    if task == "regression" and dataset_key == "C":
+        c_decision = c_candidate_decision(before, after, c_reference_rmse, **(c_policy or {}))
+        nasa_gate = c_decision["nasa_gate"]
+        accepted, promote = c_decision["accepted"], c_decision["promote"]
     return {
         "metric": after_name or before_name,
         "before": round(float(before_value), 6),
@@ -478,6 +486,10 @@ def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> d
         "gain": round(float(gain), 6),
         "accepted": bool(accepted),
         "promote": bool(promote and accepted),
+        **({"nasa_gate": nasa_gate} if nasa_gate is not None else {}),
+        **({"c_risk": c_decision} if c_decision is not None else {}),
+        **({"policy_gain": gain if gain > 0 else c_decision["nasa_gain"]}
+           if c_decision is not None and promote else {}),
     }
 
 
