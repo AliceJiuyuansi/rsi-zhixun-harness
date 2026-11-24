@@ -1,7 +1,0 @@
-# Runtime dependencies of the offline RSI image.
-# Deliberately minimal: the official task states the data is small and ships
-# pre-extracted features, and CPU is enough. No network client, no LLM SDK.
-numpy>=1.26,<3
-scikit-learn>=1.4,<2
-scipy>=1.11,<2
-PyYAML>=6,<7
