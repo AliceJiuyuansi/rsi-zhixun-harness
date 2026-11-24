@@ -195,64 +195,103 @@ def score_gap(best: float, last: float, higher_is_better: bool) -> float:
 
 
 # --------------------------------------------------------------- verdicts
-def extract_text(response: dict | None) -> str:
-    """Best-effort text from an OpenAI-style model response.
-
-    Qwen3.5-4B (the v1 binding) puts its chain of thought in
-    ``reasoning_content`` and leaves ``content`` empty, which is why v1 wrote
-    ``reason="no model text"``. We accept either, plus list-shaped content.
-    """
+def extract_text_with_source(response: dict | None) -> tuple[str, str]:
+    """Prefer the final answer. Reasoning is a parse-only, never-log fallback."""
     if not isinstance(response, dict):
-        return ""
+        return "", ""
     choices = response.get("choices")
     first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
     message = first.get("message")
     message = message if isinstance(message, dict) else {}
-    for key in ("content", "reasoning_content", "reasoning"):
-        value = message.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
+    for key, value in (("content", message.get("content")), ("output_text", response.get("output_text")),
+                       ("reasoning_content", message.get("reasoning_content")), ("reasoning", message.get("reasoning"))):
         if isinstance(value, list):
-            parts = [item["text"] for item in value
-                     if isinstance(item, dict) and isinstance(item.get("text"), str)]
-            joined = "".join(parts).strip()
-            if joined:
-                return joined
-    text = response.get("output_text")
-    return text.strip() if isinstance(text, str) else ""
+            value = "".join(item["text"] for item in value
+                            if isinstance(item, dict) and isinstance(item.get("text"), str))
+        if isinstance(value, str) and value.strip():
+            return value.strip(), key
+    return "", ""
 
 
-def parse_verdict(text: str) -> dict | None:
-    """Extract the first JSON object that looks like a decision. Never raises."""
-    if not isinstance(text, str) or not text.strip():
+def extract_text(response: dict | None) -> str:
+    return extract_text_with_source(response)[0]
+
+
+def _normalise_verdict(payload: dict) -> dict | None:
+    decision = payload.get("decision", payload.get("action", payload.get("verdict")))
+    if not isinstance(decision, str):
         return None
-    decoder = json.JSONDecoder()
-    for match in re.finditer(r"\{", text):
-        try:
-            payload, _ = decoder.raw_decode(text[match.start():])
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(payload, dict):
-            continue
-        decision = payload.get("decision", payload.get("action", payload.get("verdict")))
-        if not isinstance(decision, str):
-            continue
-        decision = decision.strip().lower()
-        if decision in ("train", "continue", "update", "finetune", "retrain"):
-            action = "train"
-        elif decision in ("hold", "keep", "none", "wait", "noop", "freeze"):
-            action = "hold"
-        elif decision in ("rollback", "revert", "reject"):
-            action = "rollback"
-        else:
-            continue
+    decision = decision.strip().lower()
+    if decision in ("train", "continue", "update", "finetune", "retrain"):
+        action = "train"
+    elif decision in ("hold", "keep", "none", "wait", "noop", "freeze"):
+        action = "hold"
+    elif decision in ("rollback", "revert", "reject"):
+        action = "rollback"
+    else:
+        return None
+    try:
         return {
             "action": action,
             "epochs": _finite(payload.get("epochs"), 0.0),
             "lr": _finite(payload.get("lr", payload.get("learning_rate")), 0.0),
             "reason": str(payload.get("reason", ""))[:400],
         }
-    return None
+    except (OverflowError, RecursionError):
+        return None
+
+
+def parse_truncated_verdict(text: str, budget: dict | None = None) -> dict | None:
+    """Repair only an unambiguous flat decision prefix, never infer an action from prose."""
+    if not isinstance(text, str) or "{" not in text:
+        return None
+    fragment = text[text.index("{"):].rstrip()
+    if not re.match(r'\{\s*"(?:decision|action)"\s*:\s*"[a-zA-Z]+"', fragment):
+        return None
+    # Only a reason is allowed to end mid-string. Never close an unfinished
+    # decision or trust a final digit that could be part of a longer number.
+    if re.search(r',\s*"reason"\s*:\s*"(?:[^"\\\x00-\x1f]|\\.)*\Z', fragment):
+        fragment += '"'
+    if fragment.endswith(','):
+        fragment = fragment[:-1]
+    elif not fragment.endswith('"'):
+        return None
+    try:
+        pairs = json.loads(fragment + '}', object_pairs_hook=list, parse_int=float)
+    except (ValueError, RecursionError):
+        return None
+    payload = dict(pairs)
+    allowed = {"decision", "action", "epochs", "lr", "learning_rate", "reason"}
+    if (len(payload) != len(pairs) or not payload.keys() <= allowed
+            or {"decision", "action"} <= payload.keys() or {"lr", "learning_rate"} <= payload.keys()
+            or not isinstance(payload.get("reason", ""), str)):
+        return None
+    for key in ("epochs", "lr", "learning_rate"):
+        if key in payload and (type(payload[key]) not in (int, float) or _finite(payload[key], -1.0) < 0):
+            return None
+    payload["reason"] = "truncated_json_recovered"
+    if budget:
+        payload.setdefault("epochs", budget.get("epochs"))
+        if "learning_rate" not in payload:
+            payload.setdefault("lr", budget.get("lr"))
+    return _normalise_verdict(payload)
+
+
+def parse_verdict(text: str, *, allow_truncated: bool = True) -> dict | None:
+    """Read complete JSON first. Live callers must explicitly gate truncation on the receipt."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r"\{", text):
+        try:
+            payload, _ = decoder.raw_decode(text, match.start())
+        except (ValueError, RecursionError):
+            continue
+        if isinstance(payload, dict):
+            verdict = _normalise_verdict(payload)
+            if verdict is not None:
+                return verdict
+    return parse_truncated_verdict(text) if allow_truncated else None
 
 
 # --------------------------------------------------------------- history
@@ -454,6 +493,22 @@ def apply_verdict(budget: dict, verdict: dict | None, history: dict,
 
 
 # --------------------------------------------------------------- acceptance
+def _bearing_macro_gain(before: dict, after: dict) -> float | None:
+    """Mean relative RMSE improvement over comparable, non-degenerate bearings."""
+    left, right = before.get("by_group"), after.get("by_group")
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return None
+    gains = []
+    for key in sorted(left.keys() & right.keys()):
+        if not isinstance(left[key], dict) or not isinstance(right[key], dict):
+            continue
+        old = _finite(left[key].get("rmse"), -1.0)
+        new = _finite(right[key].get("rmse"), -1.0)
+        if old > _EPS and new >= 0:
+            gains.append((old - new) / old)
+    return sum(gains) / len(gains) if len(gains) >= 2 else None
+
+
 def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> dict:
     """Should the candidate replace the parent, and is the gain worth a upload?"""
     before_name, before_value, higher = metric_value(task, before)
@@ -469,8 +524,20 @@ def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> d
             promote = gain >= CLASS_MIN_GAIN
     else:
         gain = (before_value - after_value) / max(abs(before_value), _EPS)
+        effective_gain = gain
         accepted = gain >= -1e-9
-        promote = gain >= REG_MIN_GAIN
+        nasa_bonus = False
+        if dataset_key == "B" and before_name == after_name == "rmse" and gain >= -0.0005:
+            macro = _bearing_macro_gain(before, after)
+            if macro is not None:
+                effective_gain = max(gain, 0.70 * gain + 0.30 * macro)
+                accepted = accepted or effective_gain >= REG_MIN_GAIN
+        if dataset_key == "C" and before_name == after_name == "rmse":
+            delta = _finite(after.get("nasa_log1p"), math.nan) - _finite(before.get("nasa_log1p"), math.nan)
+            if delta > 0.50:
+                accepted = False
+            nasa_bonus = gain >= 0.0005 and delta <= -0.15
+        promote = effective_gain >= REG_MIN_GAIN or nasa_bonus
     return {
         "metric": after_name or before_name,
         "before": round(float(before_value), 6),

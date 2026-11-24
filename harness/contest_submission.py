@@ -64,14 +64,14 @@ WORKSPACE = Path(os.environ.get("CONTEST_WORK", "/workspace"))
 STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
-# 本地与镜像默认均采用 v7 策略；预测本身不再依赖发布环境变量。
-RELEASE = os.environ.get("RSI_RELEASE", "0.7.1")
+# 版本号用于交付记录；预测策略仍随检查点保存。
+RELEASE = os.environ.get("RSI_RELEASE", "0.8")
 
 
 def calibration_enabled(release, override=None):
     """显式0/1优先；未指定时采用对应版本默认值。"""
     if override is None:
-        return release in ("0.7", "0.7.1")
+        return release in ("0.7", "0.7.1", "0.8")
     return override.strip().lower() not in ("0", "false", "no", "off", "")
 
 
@@ -138,8 +138,9 @@ def _metric_state(previous: dict, before: dict, task: str) -> dict:
 
 def _model_prompt(payload: dict) -> str:
     return (
+        "/no_think\n"
         "你是工业模型自进化系统的决策器。下面是一轮的真实状态（JSON）。\n"
-        "请只输出一行 JSON，不要解释，不要 Markdown：\n"
+        "请第一行直接输出唯一一行 JSON，不要思考过程，不要解释，不要 Markdown：\n"
         '{"decision":"train|hold","epochs":0-3,"lr":0.0005-0.003,"reason":"不超过60字"}\n'
         "规则：新阶段数据到达且有漂移时可 train；连续多轮无收益、或没有新数据且指标稳定时 hold；"
         "绝不建议超过规则预算的 epochs。\n"
@@ -306,6 +307,7 @@ def train(rnd) -> None:
                 learning_rate=float(decision["lr"]),
                 patience=EARLY_STOP_PATIENCE,
                 calibrate_c=calibrate_c,
+                smooth_weights=True,
                 validation_groups=validation_groups,
                 stage_id=stage_id or f"round-{rnd.round_index}",
                 hypothesis=decision["reason"],
