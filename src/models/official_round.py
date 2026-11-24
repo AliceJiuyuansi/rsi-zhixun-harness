@@ -47,6 +47,43 @@ def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     return {"mae": float(np.mean(np.abs(err))), "rmse": float(np.sqrt(np.mean(err ** 2)))}
 
 
+def nasa_metrics(y_true, y_pred) -> dict:
+    """实际服务输出的逐样本 NASA 求和；对数总分保留极端尾部诊断。"""
+    truth = np.asarray(y_true, dtype=float).reshape(-1)
+    pred = np.asarray(y_pred, dtype=float).reshape(-1)
+    if truth.shape != pred.shape or not truth.size or not np.all(np.isfinite(truth)) or not np.all(np.isfinite(pred)):
+        raise ValueError("NASA requires equally sized nonempty finite arrays")
+    error = pred - truth
+    exponent = np.where(error < 0, -error / 13.0, error / 10.0)
+    # log(expm1(x))，避免大指数溢出；x=0 的贡献为零。
+    log_terms = np.full_like(exponent, -np.inf)
+    positive = exponent > 0
+    values = exponent[positive]
+    log_terms[positive] = values + np.log(-np.expm1(-values))
+    if not np.any(positive):
+        return {"nasa": 0.0, "nasa_log1p": 0.0, "nasa_saturated": False}
+    peak = float(np.max(log_terms))
+    log_sum = peak + float(np.log(np.exp(log_terms - peak).sum()))
+    limit = float(np.log(np.finfo(float).max))
+    saturated = log_sum >= limit
+    return {"nasa": float(np.finfo(float).max) if saturated else float(np.exp(log_sum)),
+            "nasa_log1p": float(np.logaddexp(0.0, log_sum)), "nasa_saturated": saturated}
+
+
+def grouped_regression_metrics(y_true, y_pred, groups) -> dict:
+    """观察性设备报告；不改变父子选择与公开聚合指标。"""
+    truth, pred = np.asarray(y_true).reshape(-1), np.asarray(y_pred).reshape(-1)
+    if len(groups) != len(truth):
+        raise ValueError("validation groups must align with targets")
+    known = np.asarray([g if isinstance(g, str) and g.strip() else "" for g in groups])
+    by_group = {}
+    for group in sorted(set(known) - {""}):
+        mask = known == group
+        by_group[group] = {"rows": int(mask.sum()), **regression_metrics(truth[mask], pred[mask])}
+    return {"by_group": by_group, "group_rows": int(np.sum(known != "")),
+            "ungrouped_rows": int(np.sum(known == ""))}
+
+
 def _primary_score(metrics: dict) -> float:
     """One number to compare epochs: macro-F1 when present, else -RMSE."""
     if "macro_f1" in metrics:
@@ -99,18 +136,23 @@ class OfficialRound:
                                                           fromlist=["checkpoint_digest"]).checkpoint_digest
 
     # --- metrics -------------------------------------------------------
-    def evaluate(self, model: "Model", X: np.ndarray, y: np.ndarray) -> dict:
+    def evaluate(self, model: "Model", X: np.ndarray, y: np.ndarray, groups=None) -> dict:
         pred = model.predict(np.asarray(X, dtype=float))
         if model.meta["task"] == "classification":
             labels = pred.argmax(axis=1)
             return {"accuracy": float(np.mean(labels == y)), "macro_f1": macro_f1(y, labels)}
-        return regression_metrics(y, pred)
+        metrics = regression_metrics(y, pred)
+        if len(model.meta["paths"]) == 24:
+            metrics.update(nasa_metrics(y, pred))
+        if groups is not None:
+            metrics.update(grouped_regression_metrics(y, pred, groups))
+        return metrics
 
     # --- the only update primitive -------------------------------------
     def continue_round(self, parent_checkpoint: str | Path, X_train, y_train,
                        X_val, y_val, *, out_dir: str | Path, epochs: int = 3,
                        learning_rate: float | None = None, batch_size: int | None = None,
-                       patience: int = 0, calibrate_c: bool = False,
+                       patience: int = 0, calibrate_c: bool = False, validation_groups=None,
                        stage_id: str = "round", hypothesis: str = "",
                        change_summary: str = "") -> RoundResult:
         """Continue the parent for up to `epochs`, keeping the best-scoring weights.
@@ -136,7 +178,9 @@ class OfficialRound:
         if X_val.shape[1] != len(model.meta["paths"]):
             raise ValueError("validation features do not match the checkpoint schema")
 
-        before = self.evaluate(model, X_val, y_val)
+        before = self.evaluate(model, X_val, y_val, groups=validation_groups)
+        epochs_before = int(model.meta["epochs"])
+        steps_before = int(model.meta["steps"])
         if learning_rate is not None:
             model.meta["learning_rate"] = float(learning_rate)
         if batch_size is not None:
@@ -163,7 +207,7 @@ class OfficialRound:
                     model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train))
                 except Exception:  # noqa: BLE001 - calibration is optional; keep training
                     model.meta.pop("c_calibration", None)
-            validation = self.evaluate(model, X_val, y_val)
+            validation = self.evaluate(model, X_val, y_val, groups=validation_groups)
             history.append({"epoch": int(model.meta["epochs"]), "step": int(model.meta["steps"]),
                             "loss": float(loss), "validation": validation})
 
@@ -192,15 +236,19 @@ class OfficialRound:
         else:  # no epochs ran (epochs=0 is rejected earlier, but stay safe)
             model.save(checkpoint)
         after = best_validation  # the saved checkpoint is the best-scoring snapshot
+        selected_model = Model.load(str(checkpoint))
         result = RoundResult(
             out_dir=out, checkpoint=checkpoint,
             checkpoint_sha=checkpoint_digest(checkpoint),
             parent_sha=checkpoint_digest(parent),
             metrics_before=before, metrics_after=after, history=history,
-            seconds=seconds, epochs_before=int(model.meta["epochs"]) - epochs_run,
-            epochs_after=int(model.meta["epochs"]), steps_after=int(model.meta["steps"]),
+            seconds=seconds, epochs_before=epochs_before,
+            epochs_after=int(selected_model.meta["epochs"]), steps_after=int(selected_model.meta["steps"]),
             config={"epochs_requested": int(epochs), "epochs_run": epochs_run,
                     "early_stopped": bool(epochs_run < int(epochs)),
+                    "executed_steps": int(model.meta["steps"]) - steps_before,
+                    "executed_final_epochs": int(model.meta["epochs"]),
+                    "executed_final_steps": int(model.meta["steps"]),
                     "learning_rate": float(model.meta["learning_rate"]),
                     "batch_size": int(model.meta["batch_size"]),
                     "calibrate_c": bool(calibrate_c),
@@ -217,6 +265,8 @@ class OfficialRound:
                   "checkpoint_sha256": result.checkpoint_sha,
                   "initial_epochs": result.epochs_before, "final_epochs": result.epochs_after,
                   "final_steps": result.steps_after, "training_seconds": seconds,
+                  "executed_final_epochs": result.config["executed_final_epochs"],
+                  "executed_final_steps": result.config["executed_final_steps"],
                   "learning_rate": result.config["learning_rate"],
                   "batch_size": result.config["batch_size"],
                   "calibrate_c": bool(calibrate_c),

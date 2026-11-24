@@ -35,19 +35,18 @@ if str(PLATFORM_APP_DIR) not in sys.path:
     sys.path.insert(0, str(PLATFORM_APP_DIR))
 
 from src.harness.guard import Gatekeeper  # noqa: E402
+from src.harness.model_receipt import decide_with_receipt  # noqa: E402
 from src.harness.round_controller import (  # noqa: E402
     acceptance,
-    apply_verdict,
     choose_budget,
     clip_regression_prediction,
     decision_record,
-    extract_text,
     feature_profile,
     js_divergence,
     metric_value,
-    parse_verdict,
     prediction_profile,
     psi_against,
+    row_observation,
     score_gap,
     summarise_history,
 )
@@ -65,12 +64,19 @@ WORKSPACE = Path(os.environ.get("CONTEST_WORK", "/workspace"))
 STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
-# v4 ships with calibration off; v5 sets RSI_C_CALIBRATION=1 at image build time.
-C_CALIBRATION_ENABLED = (
-    os.environ.get("RSI_RELEASE") == "0.7" or
-    os.environ.get("RSI_C_CALIBRATION", "0").strip().lower() not in ("0", "false", "no", "off", "")
-)
-STATE_SCHEMA = 2
+# 本地与镜像默认均采用 v7 策略；预测本身不再依赖发布环境变量。
+RELEASE = os.environ.get("RSI_RELEASE", "0.7.1")
+
+
+def calibration_enabled(release, override=None):
+    """显式0/1优先；未指定时采用对应版本默认值。"""
+    if override is None:
+        return release in ("0.7", "0.7.1")
+    return override.strip().lower() not in ("0", "false", "no", "off", "")
+
+
+C_CALIBRATION_ENABLED = calibration_enabled(RELEASE, os.environ.get("RSI_C_CALIBRATION"))
+STATE_SCHEMA = 3
 
 
 def log_to_stderr(message: str) -> None:
@@ -171,8 +177,9 @@ def train(rnd) -> None:
     validation_rows = int(len(validation_dataset["ids"]))
 
     trainer = OfficialRound()
+    validation_groups = validation_dataset["groups"] if rnd.dataset_key == "B" else None
     validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
-                                         validation_dataset["y"])
+                                         validation_dataset["y"], groups=validation_groups)
     metric_state = _metric_state(previous_state, validation_before, task)
 
     # --- 3. drift: against last stage, against round 1, and train vs val --
@@ -200,7 +207,8 @@ def train(rnd) -> None:
         # was never observed within this stage.
         metric_state["best"] = metric_state["before"]
         metric_state["gap"] = 0.0
-    data_grew = train_rows > int(previous_state.get("n_train", 0))
+    row_state = row_observation(previous_state, train_rows, validation_rows, int(rnd.round_index))
+    data_grew = row_state["data_grew"]
     history["kill_switch"] = bool(previous_state.get("kill_switch"))
 
     # --- 4. rule budget, then let the model narrow it ---------------------
@@ -226,12 +234,9 @@ def train(rnd) -> None:
         "last_gain": history["last_gain"], "stalled": history["stalled"],
         "rule_budget": budget,
     }
-    model_receipt = rnd.model(
-        [{"role": "user", "content": _model_prompt(model_state)}],
-        max_tokens=min(256, rnd.max_output_tokens), temperature=0)
-    model_text = extract_text(model_receipt.response)
-    verdict = parse_verdict(model_text)
-    decision = apply_verdict(budget, verdict, history, int(rnd.round_index))
+    decision, model_text, model_diagnostics = decide_with_receipt(
+        rnd, _model_prompt(model_state), budget, history, int(rnd.round_index))
+    audit.write("model_receipt", step=int(rnd.round_index), **model_diagnostics)
     # The host may start with an older state. Recover its spent budget from the
     # platform's round records before assigning the next request.
     prior_spend = sum(int((r.get("configuration") or {}).get("epochs") or 0)
@@ -241,10 +246,11 @@ def train(rnd) -> None:
     if task_limit is not None and decision["epochs"] > max(0, task_limit - prior_spend):
         remaining = max(0, task_limit - prior_spend)
         decision.update(epochs=remaining, action="finetune" if remaining else "none",
-                        rule="epoch_limit", reason="Remaining per-task epoch budget")
+                        rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
     log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
                   f"stage_changed={stage_changed} rule={budget['rule']} "
-                  f"model={decision.get('model_action')} budget={decision['epochs']}ep")
+                  f"model={decision.get('model_action')} source={decision['source']} "
+                  f"model_status={model_diagnostics['status']} budget={decision['epochs']}ep")
 
     # --- 5. controlled execution: kill-switch / whitelist / budget / bounds
     gate = Gatekeeper(
@@ -271,6 +277,7 @@ def train(rnd) -> None:
     if not gated.approved:
         log_to_stderr(f"gate rejected: {gated.reason}; keeping parent")
         decision.update(action="none", epochs=0, lr=0.0, rule="gate_reject",
+                        source="gate",
                         reason=f"闸门拒绝：{gated.reason}；保持父模型")
     elif decision["epochs"] > 0:
         # the amplitude limiter may clip params; never let it *increase* epochs
@@ -299,6 +306,7 @@ def train(rnd) -> None:
                 learning_rate=float(decision["lr"]),
                 patience=EARLY_STOP_PATIENCE,
                 calibrate_c=calibrate_c,
+                validation_groups=validation_groups,
                 stage_id=stage_id or f"round-{rnd.round_index}",
                 hypothesis=decision["reason"],
                 change_summary=json.dumps({"rule": decision["rule"],
@@ -325,7 +333,12 @@ def train(rnd) -> None:
         code_snapshot_dir = candidate_dir / "code"
         code_snapshot_dir.mkdir(exist_ok=True)
         for source_file in (Path(__file__), PLATFORM_APP_DIR / "src/policy/strategy.py",
-                            PLATFORM_APP_DIR / "src/harness/round_controller.py"):
+                            PLATFORM_APP_DIR / "src/harness/round_controller.py",
+                            PLATFORM_APP_DIR / "src/harness/model_receipt.py",
+                            PLATFORM_APP_DIR / "src/models/official_round.py",
+                            PLATFORM_APP_DIR / "vendor/contest_baselines/model.py",
+                            PLATFORM_APP_DIR / "vendor/contest_baselines/data.py",
+                            PLATFORM_APP_DIR / "vendor/contest_baselines/c_calibration.py"):
             if source_file.exists():
                 shutil.copyfile(source_file, code_snapshot_dir / source_file.name)
         candidate_receipt = rnd.submit_candidate(
@@ -413,6 +426,11 @@ def train(rnd) -> None:
         "n_train": train_rows,
         "requested_epochs_total": prior_spend + int(decision["epochs"]),
         "n_validation": validation_rows,
+        **row_state,
+        "release": RELEASE,
+        "prediction_policy": "nonnegative_unbounded",
+        "model_receipt": model_diagnostics,
+        "validation_selected": final_metrics,
         "baseline": round(float(previous_state.get("baseline", metric_state["before"])), 6),
         "best": round(float(best_value), 6),
         "last": round(float(selected_value), 6),
@@ -473,6 +491,8 @@ def train(rnd) -> None:
                        "rows": {"train": train_rows, "validation": validation_rows},
                        "stage_changed": stage_changed, "data_grew": data_grew,
                        "history": history["recent"], "model_action": decision.get("model_action"),
+                       "source": decision["source"], "model_receipt": model_diagnostics,
+                       "release": RELEASE, "prediction_policy": "nonnegative_unbounded",
                        "accepted": bool(outcome and outcome.get("accepted")),
                        "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
                        "promoted": promoted, "gain": None if not outcome else outcome["gain"],

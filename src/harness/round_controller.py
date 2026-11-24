@@ -204,16 +204,17 @@ def extract_text(response: dict | None) -> str:
     """
     if not isinstance(response, dict):
         return ""
-    try:
-        message = response["choices"][0].get("message") or {}
-    except (KeyError, IndexError, TypeError):
-        message = {}
+    choices = response.get("choices")
+    first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+    message = first.get("message")
+    message = message if isinstance(message, dict) else {}
     for key in ("content", "reasoning_content", "reasoning"):
         value = message.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
         if isinstance(value, list):
-            parts = [item.get("text", "") for item in value if isinstance(item, dict)]
+            parts = [item["text"] for item in value
+                     if isinstance(item, dict) and isinstance(item.get("text"), str)]
             joined = "".join(parts).strip()
             if joined:
                 return joined
@@ -485,6 +486,17 @@ def clip_regression_prediction(value: float, feature_count: int) -> float:
     return max(0.0, float(value))
 
 
+def row_observation(previous: dict, train: int, validation: int, round_index: int) -> dict:
+    """从实际加载行数生成 schema3 观测，兼容已有 n_train。"""
+    rows = {"train": int(train), "validation": int(validation)}
+    previous_rows = previous.get("rows") or {}
+    previous_train = int(previous_rows.get("train", previous.get("n_train", 0)))
+    history = [item for item in (previous.get("rows_history") or [])
+               if isinstance(item, dict) and item.get("round") != int(round_index)]
+    history.append({"round": int(round_index), **rows})
+    return {"rows": rows, "rows_history": history[-10:], "data_grew": int(train) > previous_train}
+
+
 def decision_record(*, round_index: int, stage_id: str, dataset_key: str,
                     action: dict, history: dict, psi: dict, model_verdict: str,
                     outcome: dict | None, accepted: bool, region: str = "") -> dict:
@@ -500,6 +512,7 @@ def decision_record(*, round_index: int, stage_id: str, dataset_key: str,
         "psi": psi,
         "history": history.get("evidence", ""),
         "model_action": action.get("model_action", "unavailable"),
+        "source": action.get("source", "rule"),
         "model_reason": (action.get("model_reason") or "")[:200],
         "model_text": (model_verdict or "")[:200],
         "outcome": outcome or {},
