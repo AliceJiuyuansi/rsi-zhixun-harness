@@ -95,12 +95,12 @@ def _primary_score(metrics: dict) -> float:
     return float(metrics.get("accuracy", 0.0))
 
 
-def _refit_c(model: Model, X_train, y_train) -> None:
+def _refit_c(model: Model, X_train, y_train, mode: str = "v8") -> None:
     from vendor.contest_baselines.c_calibration import fit
 
     # Fit residuals on the uncalibrated training predictions, never on the holdout.
     model.meta.pop("c_calibration", None)
-    model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train))
+    model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train), mode=mode)
 
 
 @dataclass
@@ -165,7 +165,7 @@ class OfficialRound:
                        patience: int = 0, calibrate_c: bool = False, validation_groups=None,
                        stage_id: str = "round", hypothesis: str = "",
                        change_summary: str = "", smooth_weights: bool = False,
-                       selection_task: str = "") -> RoundResult:
+                       selection_task: str = "", calibration_mode: str = "v8") -> RoundResult:
         """Continue the parent for up to `epochs`, keeping the best-scoring weights.
 
         `patience > 0` enables early stopping: after that many epochs without a
@@ -241,7 +241,7 @@ class OfficialRound:
             if calibrate_c:
                 try:
                     with measured("calibration"):
-                        _refit_c(model, X_train, y_train)
+                        _refit_c(model, X_train, y_train, mode=calibration_mode)
                 except Exception:  # noqa: BLE001 - calibration is optional; keep training
                     model.meta.pop("c_calibration", None)
             with measured("validation"):
@@ -283,7 +283,7 @@ class OfficialRound:
             try:
                 if calibrate_c:
                     with measured("smoothed_calibration"):
-                        _refit_c(smoothed, X_train, y_train)
+                        _refit_c(smoothed, X_train, y_train, mode=calibration_mode)
                 with measured("smoothed_validation"):
                     validation = self.evaluate(smoothed, X_val, y_val, groups=validation_groups)
             except (ValueError, ArithmeticError, np.linalg.LinAlgError):
@@ -323,6 +323,7 @@ class OfficialRound:
                     "learning_rate": float(model.meta["learning_rate"]),
                     "batch_size": int(model.meta["batch_size"]),
                     "calibrate_c": bool(calibrate_c),
+                    "calibration_mode": calibration_mode if calibrate_c else "",
                     "stage_id": stage_id, "hypothesis": hypothesis,
                     "change_summary": change_summary},
         )

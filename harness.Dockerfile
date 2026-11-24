@@ -12,13 +12,14 @@
 #   docker run --rm --network none zhixun-rsi-harness:0.9 describe
 FROM python:3.11-slim
 
-ARG RSI_RELEASE=0.9
+ARG RSI_RELEASE=0.9.2
 LABEL org.opencontainers.image.title="zhixun-rsi-harness" \
       org.opencontainers.image.version="${RSI_RELEASE}" \
       org.opencontainers.image.description="Contest 9 harness: offline continuation + drift-gated updates"
 
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 ARG RSI_C_CALIBRATION=1
+ARG RSI_C_CAL_MODE=
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
@@ -30,7 +31,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     RSI_SWAN_MODE=disabled \
     RSI_RELEASE=${RSI_RELEASE} \
-    RSI_C_CALIBRATION=${RSI_C_CALIBRATION}
+    RSI_C_CALIBRATION=${RSI_C_CALIBRATION} \
+    RSI_C_CAL_MODE=${RSI_C_CAL_MODE}
 
 # 1) SDK（官方 1.0.4，随平台下载包，不打网络补丁）
 COPY _sdk/contest-harness-sdk-1.0.4 /opt/contest-harness-sdk

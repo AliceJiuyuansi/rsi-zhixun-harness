@@ -66,17 +66,31 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 版本号用于交付记录；预测策略仍随检查点保存。
-RELEASE = os.environ.get("RSI_RELEASE", "0.9")
+RELEASE = os.environ.get("RSI_RELEASE", "0.9.2")
 
 
 def calibration_enabled(release, override=None):
     """显式0/1优先；未指定时采用对应版本默认值。"""
     if override is None:
-        return release in ("0.7", "0.7.1", "0.8", "0.9")
+        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2")
     return override.strip().lower() not in ("0", "false", "no", "off", "")
 
 
+def calibration_mode(release, override=None):
+    """C 校准器模式：显式 RSI_C_CAL_MODE 优先，否则按 RELEASE 选择。"""
+    if override is not None and override.strip():
+        mode = override.strip().lower()
+        if mode in ("v8", "spline_v2", "res_mlp_v1"):
+            return mode
+    if release == "0.9.1":
+        return "spline_v2"
+    if release == "0.9.2":
+        return "res_mlp_v1"
+    return "v8"
+
+
 C_CALIBRATION_ENABLED = calibration_enabled(RELEASE, os.environ.get("RSI_C_CALIBRATION"))
+C_CALIBRATION_MODE = calibration_mode(RELEASE, os.environ.get("RSI_C_CAL_MODE"))
 STATE_SCHEMA = 3
 
 
@@ -298,7 +312,8 @@ def train(rnd) -> None:
     if int(decision["epochs"]) > 0:
         try:
             log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
-                          f"calibrate_c={calibrate_c}")
+                          f"calibrate_c={calibrate_c} mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
+            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2")
             round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
@@ -308,7 +323,8 @@ def train(rnd) -> None:
                 learning_rate=float(decision["lr"]),
                 patience=EARLY_STOP_PATIENCE,
                 calibrate_c=calibrate_c,
-                selection_task=str(rnd.dataset_key) if RELEASE == "0.9" else "",
+                calibration_mode=C_CALIBRATION_MODE,
+                selection_task=str(rnd.dataset_key) if use_paired else "",
                 smooth_weights=True,
                 validation_groups=validation_groups,
                 stage_id=stage_id or f"round-{rnd.round_index}",
@@ -316,7 +332,7 @@ def train(rnd) -> None:
                 change_summary=json.dumps({"rule": decision["rule"],
                                            "signals": decision["signals"]},
                                           ensure_ascii=False))
-            decide_promotion = paired_acceptance if RELEASE == "0.9" else acceptance
+            decide_promotion = paired_acceptance if use_paired else acceptance
             outcome = decide_promotion(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key))
             gate.commit(gated.action, step=int(rnd.round_index))
             gate.note_step_ok()
