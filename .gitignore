@@ -1,5 +1,5 @@
 # 数据与产物
-data/
+/data/
 XJTU-SY_Bearing_Datasets/
 experiments/
 reports/*.pdf

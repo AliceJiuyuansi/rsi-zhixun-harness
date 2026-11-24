@@ -20,7 +20,7 @@ class PredictionCapTests(unittest.TestCase):
                 model = Model("regression", paths, [], x, np.full(2,5000.0), hidden=4)
                 np.testing.assert_allclose(model.predict(x), expected)
                 np.testing.assert_allclose(model.predict(x[:1]), expected)
-                for release in ["0.6", "0.7", "0.7.1", "unexpected"]:
+                for release in ["0.6", "0.7", "0.7.1", "0.7.2", "unexpected"]:
                     with patch.dict("os.environ", {"RSI_RELEASE": release}):
                         np.testing.assert_allclose(model.predict(x), 5000)
                         np.testing.assert_allclose(model.predict(x[:1]), 5000)
