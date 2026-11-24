@@ -156,7 +156,17 @@ class Model:
             logits -= logits.max(axis=1, keepdims=True)
             result = np.exp(logits)
             return result / result.sum(axis=1, keepdims=True)
-        return np.maximum(0, logits[:, 0] * self.meta["target_scale"] + self.meta["target_mean"])
+        prediction = np.maximum(0, logits[:, 0] * self.meta["target_scale"] + self.meta["target_mean"])
+        if "c_calibration" in self.meta:
+            try:
+                from .c_calibration import predict
+                prediction = predict(x, prediction, self.meta["c_calibration"])
+            except Exception:  # noqa: BLE001 - serving must fall back to the base model
+                # A malformed/unseen calibration must never fail the whole
+                # prediction; the parent MLP output is a safe fallback.
+                pass
+        # v7.1 固定为非负、无上限；同一检查点不能随宿主环境改变预测。
+        return prediction
 
     def save(self, path):
         self.validate()

@@ -1,4 +1,5 @@
 """Read only explicitly supplied public training/validation data."""
+from functools import lru_cache
 import hashlib
 import json
 import math
@@ -30,6 +31,11 @@ def json_value(raw):
     return json.loads(raw, object_pairs_hook=unique_object, parse_constant=reject)
 
 
+@lru_cache(maxsize=2048)
+def _encode_path(path):
+    return json.dumps(path, ensure_ascii=False, separators=(",", ":"))
+
+
 def flatten(inputs):
     paths, values = [], []
     def visit(value, path, depth):
@@ -39,16 +45,16 @@ def flatten(inputs):
             for key in sorted(value):
                 if not isinstance(key, str) or re.sub(r"[^a-z0-9]", "", key.lower()) in FORBIDDEN_INPUTS:
                     raise ValueError("target-derived input field is not allowed")
-                visit(value[key], path + [("key", key)], depth + 1)
+                visit(value[key], path + (("key", key),), depth + 1)
         elif isinstance(value, list):
             for index, child in enumerate(value):
-                visit(child, path + [("index", index)], depth + 1)
+                visit(child, path + (("index", index),), depth + 1)
         elif isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-            paths.append(json.dumps(path, ensure_ascii=False, separators=(",", ":")))
+            paths.append(_encode_path(path))
             values.append(float(value))
         else:
             raise ValueError("model inputs must contain finite numeric features only")
-    visit(inputs, [], 0)
+    visit(inputs, (), 0)
     if not values or len(values) > 4096:
         raise ValueError("expected 1..4096 numeric features")
     return paths, values
@@ -59,7 +65,7 @@ def read_dataset(path, task, classes=None, expected_paths=None):
     if not path.is_file() or path.is_symlink() or path.stat().st_size > MAX_BYTES:
         raise ValueError("dataset must be a regular JSONL file no larger than 128 MiB")
     raw = path.read_bytes()
-    ids, features, targets = [], [], []
+    ids, features, targets, groups = [], [], [], []
     seen = set()
     paths = expected_paths
     for number, line in enumerate(raw.decode("utf-8").splitlines(), 1):
@@ -88,8 +94,15 @@ def read_dataset(path, task, classes=None, expected_paths=None):
         else:
             raise ValueError("unsupported task")
         ids.append(identity); seen.add(identity); features.append(values); targets.append(target)
+        # 仅用于验证分组报告，不进入输入特征或标准化。
+        meta = row.get("meta")
+        group = meta.get("bearing") if isinstance(meta, dict) else None
+        if not isinstance(group, str) or not group.strip():
+            match = re.fullmatch(r"xjtu_(Bearing\d+_\d+)_s\d+", identity)
+            group = match.group(1) if match else None
+        groups.append(group)
     if not ids:
         raise ValueError("dataset is empty")
     return {"ids": ids, "x": np.asarray(features, dtype=np.float64),
             "y": np.asarray(targets, dtype=np.int64 if task == "classification" else np.float64),
-            "paths": paths, "sha256": sha256(raw)}
+            "paths": paths, "sha256": sha256(raw), "groups": groups}

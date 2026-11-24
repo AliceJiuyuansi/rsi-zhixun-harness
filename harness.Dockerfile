@@ -4,11 +4,21 @@
 # 三合一入口 describe / train / predict，靠 SDK 与宿主通信。
 # 平台调用方式：`python3 /app/harness.py describe|train|predict`
 #
-#   docker build -f harness.Dockerfile -t zhixun-rsi-harness:0.1 .
-#   docker run --rm --network none zhixun-rsi-harness:0.1 describe
+# v0.2（2026-11-23）：platform entry now uses the v2 round controller
+# (cross-round drift reference, history read-back, model verdict, stall rule,
+#  and the Gatekeeper's whitelist/budget/bounds/kill-switch).
+#
+#   docker build -f harness.Dockerfile -t zhixun-rsi-harness:0.7.1 .
+#   docker run --rm --network none zhixun-rsi-harness:0.7.1 describe
 FROM python:3.11-slim
 
+ARG RSI_RELEASE=0.7.1
+LABEL org.opencontainers.image.title="zhixun-rsi-harness" \
+      org.opencontainers.image.version="${RSI_RELEASE}" \
+      org.opencontainers.image.description="Contest 9 harness: offline continuation + drift-gated updates"
+
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG RSI_C_CALIBRATION=1
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
@@ -18,7 +28,9 @@ ENV PYTHONUNBUFFERED=1 \
     CONTEST_APP=/app \
     CONTEST_SUBMISSION=contest_submission \
     PYTHONPATH=/app \
-    RSI_SWAN_MODE=disabled
+    RSI_SWAN_MODE=disabled \
+    RSI_RELEASE=${RSI_RELEASE} \
+    RSI_C_CALIBRATION=${RSI_C_CALIBRATION}
 
 # 1) SDK（官方 1.0.4，随平台下载包，不打网络补丁）
 COPY _sdk/contest-harness-sdk-1.0.4 /opt/contest-harness-sdk
