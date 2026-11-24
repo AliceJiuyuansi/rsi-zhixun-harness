@@ -66,13 +66,13 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 版本号用于交付记录；预测策略仍随检查点保存。
-RELEASE = os.environ.get("RSI_RELEASE", "0.9.2")
+RELEASE = os.environ.get("RSI_RELEASE", "0.14")
 
 
 def calibration_enabled(release, override=None):
     """显式0/1优先；未指定时采用对应版本默认值。"""
     if override is None:
-        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2")
+        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2", "0.14")
     return override.strip().lower() not in ("0", "false", "no", "off", "")
 
 
@@ -80,12 +80,14 @@ def calibration_mode(release, override=None):
     """C 校准器模式：显式 RSI_C_CAL_MODE 优先，否则按 RELEASE 选择。"""
     if override is not None and override.strip():
         mode = override.strip().lower()
-        if mode in ("v8", "spline_v2", "res_mlp_v1"):
+        if mode in ("v8", "spline_v2", "res_mlp_v1", "res_mlp_v2"):
             return mode
     if release == "0.9.1":
         return "spline_v2"
     if release == "0.9.2":
         return "res_mlp_v1"
+    if release == "0.14":
+        return "res_mlp_v2"
     return "v8"
 
 
@@ -193,7 +195,8 @@ def train(rnd) -> None:
     validation_rows = int(len(validation_dataset["ids"]))
 
     trainer = OfficialRound()
-    validation_groups = validation_dataset["groups"] if rnd.dataset_key == "B" else None
+    validation_groups = (validation_dataset["groups"]
+                         if rnd.dataset_key in ("B", "C") else None)
     validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
                                          validation_dataset["y"], groups=validation_groups)
     metric_state = _metric_state(previous_state, validation_before, task)
@@ -313,7 +316,7 @@ def train(rnd) -> None:
         try:
             log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
                           f"calibrate_c={calibrate_c} mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
-            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2")
+            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14")
             round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
@@ -520,7 +523,7 @@ def train(rnd) -> None:
                            "candidate": {k: round_result.metrics_after[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_after},
                            "smoothing": round_result.config["weight_smoothing"],
                            "component_cpu_seconds": round_result.config["component_cpu_seconds"],
-                       }} if RELEASE == "0.9" and round_result is not None else {}),
+                       }} if RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14") and round_result is not None else {}),
                        "accepted": bool(outcome and outcome.get("accepted")),
                        "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
                        "promoted": promoted, "gain": None if not outcome else outcome["gain"],

@@ -13,10 +13,17 @@ on host environment variables):
   Condition-aware 2-hidden-layer NumPy MLP (32, 16) trained with Tempered
   Entropic-NASA + MSE composite loss, overestimation guard, asymmetric clip
   [-120, +42], and per-condition NASA risk shift.
+- ``"res_mlp_v2"`` (v14 - fused v9.2 + v13):
+  Combines ``res_mlp_v1`` with v13's per-regime normalized parent prediction
+  features and a nonnegative-consistent endpoint corrector (applied only to
+  known regimes so unknown regimes cleanly fall back to parent prediction).
 """
 import numpy as np
 
-SUPPORTED_MODES = ("v8", "spline_v2", "res_mlp_v1")
+SUPPORTED_MODES = ("v8", "spline_v2", "res_mlp_v1", "res_mlp_v2")
+ENDPOINT_GRID = tuple(range(-6, 9, 2))
+ENDPOINT_RMSE_TOLERANCE = 0.002
+ENDPOINT_MIN_NASA_GAIN = 0.005
 
 
 def _normalized(x, conditions, moments):
@@ -330,6 +337,195 @@ def _fit_res_mlp_v1(x, y, parent_prediction):
     }
 
 
+def _parent_norm(parent, conditions, parent_moments):
+    """Normalise parent predictions inside each operating condition."""
+    parent = np.asarray(parent, dtype=float)
+    out = np.zeros(len(parent), dtype=float)
+    for condition in np.unique(conditions[np.isfinite(conditions)]):
+        pair = (parent_moments or {}).get(str(int(condition)))
+        if pair is None:
+            continue
+        mask = conditions == condition
+        mean, scale = float(pair[0]), max(float(pair[1]), 1e-5)
+        out[mask] = (parent[mask] - mean) / scale
+    return np.clip(out, -6.0, 6.0)
+
+
+def _endpoint_offsets(prediction, endpoint):
+    p20 = float(endpoint["p20"])
+    p80 = float(endpoint["p80"])
+    if not np.isfinite(p20) or not np.isfinite(p80) or p80 <= p20:
+        return np.zeros(len(prediction))
+    t = np.clip((np.asarray(prediction, dtype=float) - p20) / (p80 - p20), 0.0, 1.0)
+    return float(endpoint["low"]) + (float(endpoint["high"]) - float(endpoint["low"])) * t
+
+
+def _fit_endpoint(prediction, y):
+    prediction = np.asarray(prediction, dtype=float).reshape(-1)
+    y = np.asarray(y, dtype=float).reshape(-1)
+    p20, p80 = (float(v) for v in np.quantile(prediction, (0.2, 0.8)))
+    endpoint = {"p20": p20, "p80": p80, "low": 0.0, "high": 0.0, "enabled": False}
+    if len(y) < 64 or p80 <= p20:
+        return endpoint
+    base_rmse, base_log = _metrics(prediction - y)
+    if base_rmse == 0.0 or base_log == -np.inf:
+        return endpoint
+    best = (base_log, 0.0, 0.0, base_rmse)
+    for low in ENDPOINT_GRID:
+        for high in ENDPOINT_GRID:
+            if low == 0 and high == 0:
+                continue
+            candidate = np.maximum(
+                0.0,
+                prediction + _endpoint_offsets(
+                    prediction, {"p20": p20, "p80": p80, "low": low, "high": high}
+                ),
+            )
+            rmse, log = _metrics(candidate - y)
+            if rmse > base_rmse * (1.0 + ENDPOINT_RMSE_TOLERANCE):
+                continue
+            if log < best[0] - 1e-12:
+                best = (log, float(low), float(high), rmse)
+    log, low, high, _ = best
+    improved = log <= base_log + np.log(1.0 - ENDPOINT_MIN_NASA_GAIN)
+    endpoint.update(
+        low=low if improved else 0.0,
+        high=high if improved else 0.0,
+        enabled=bool(improved and (low or high)),
+    )
+    return endpoint
+
+
+def _fit_res_mlp_v2(x, y, parent_prediction):
+    hidden = (32, 16)
+    epochs, lr, wd, bs = 12, 9e-3, 6e-4, 2048
+    gamma, nasa_w, nasa_scale, t_cap, over_boost = 0.50, 0.52, 3.5, 22.0, 1.15
+    neg_clip, pos_clip = 120.0, 42.0
+
+    conditions = np.rint(x[:, 21])
+    moments = _fit_moments(x, conditions)
+    cond_keys = sorted(int(k) for k in moments)
+    cond_int = conditions.astype(int)
+    active = [
+        i for i in range(21)
+        if any(moments[str(c)][1][i] != 1.0 or float(np.std(x[:, i])) > 1e-5 for c in cond_keys)
+    ]
+    if not active:
+        active = list(range(21))
+
+    p_mu = float(np.mean(parent_prediction))
+    p_sd = max(float(np.std(parent_prediction)), 1.0)
+    y_sd = max(float(np.std(y)), 1.0)
+
+    parent_moments = {}
+    for c in cond_keys:
+        mask = cond_int == c
+        pm = float(parent_prediction[mask].mean())
+        ps = float(parent_prediction[mask].std())
+        if ps < 1e-5:
+            ps = 1.0
+        parent_moments[str(c)] = [pm, ps]
+
+    z, _ = _normalized(x, conditions, moments)
+    ck_map = {c: idx for idx, c in enumerate(cond_keys)}
+    coh = np.zeros((len(x), len(cond_keys)), dtype=float)
+    for c in cond_keys:
+        coh[cond_int == c, ck_map[c]] = 1.0
+    p_norm_g = np.clip((parent_prediction - p_mu) / p_sd, -5.0, 6.0)[:, None]
+    p_norm_c = _parent_norm(parent_prediction, conditions, parent_moments)[:, None]
+    x_feat = np.column_stack([z[:, active], coh, p_norm_g, p_norm_c]).astype(np.float32)
+    y32 = y.astype(np.float32)
+    p32 = parent_prediction.astype(np.float32)
+
+    rng = np.random.default_rng(42)
+    dims = [x_feat.shape[1], *hidden, 1]
+    params = {}
+    for i in range(len(dims) - 1):
+        params[f"w{i}"] = rng.normal(0.0, np.sqrt(1.0 / dims[i]), (dims[i], dims[i + 1])).astype(np.float32)
+        params[f"b{i}"] = np.zeros(dims[i + 1], dtype=np.float32)
+    last = len(dims) - 2
+    params[f"w{last}"] *= np.float32(0.05)
+    m1 = {k: np.zeros_like(v) for k, v in params.items()}
+    m2 = {k: np.zeros_like(v) for k, v in params.items()}
+    n_layers = len(dims) - 1
+    step = 0
+    ys32 = np.float32(y_sd)
+
+    for ep in range(epochs):
+        lr_now = np.float32(lr * (0.08 + 0.92 * 0.5 * (1.0 + np.cos(np.pi * ep / max(epochs, 1)))))
+        order = rng.permutation(len(x_feat))
+        for start in range(0, len(order), bs):
+            idx = order[start:start + bs]
+            xb, yb, pb = x_feat[idx], y32[idx], p32[idx]
+            acts = [xb]
+            for i in range(n_layers - 1):
+                acts.append(np.tanh(acts[-1] @ params[f"w{i}"] + params[f"b{i}"]))
+            out = (acts[-1] @ params[f"w{last}"] + params[f"b{last}"])[:, 0]
+            err = (pb + out * ys32) - yb
+            d_mse = np.float32(2.0) * err / (ys32 * ys32)
+            t = np.where(err < 0.0, -err / np.float32(13.0), err / np.float32(10.0))
+            dt = np.where(err < 0.0, np.float32(-1.0 / 13.0), np.float32(over_boost / 10.0))
+            gt = np.float32(gamma) * np.minimum(t, np.float32(t_cap))
+            ex = np.exp(gt - gt.max())
+            w_soft = ex / (ex.sum() + np.float32(1e-12)) * np.float32(len(idx))
+            d_nasa = w_soft * dt / ys32
+            d_pred = np.float32(1.0 - nasa_w) * d_mse + np.float32(nasa_w * nasa_scale) * d_nasa
+            delta = (d_pred * ys32 / np.float32(len(idx)))[:, None]
+            grads = {}
+            for i in range(n_layers - 1, -1, -1):
+                grads[f"w{i}"] = acts[i].T @ delta + np.float32(wd) * params[f"w{i}"]
+                grads[f"b{i}"] = delta.sum(axis=0)
+                if i > 0:
+                    delta = (delta @ params[f"w{i}"].T) * (np.float32(1.0) - acts[i] ** 2)
+            norm = float(np.sqrt(sum(float(np.sum(g * g)) for g in grads.values())))
+            if not np.isfinite(norm):
+                raise ValueError("nonfinite residual calibration gradient")
+            clip = np.float32(min(1.0, 5.0 / max(norm, 1e-12)))
+            step += 1
+            b1c = np.float32(1.0 - 0.9 ** step)
+            b2c = np.float32(1.0 - 0.999 ** step)
+            for k in params:
+                g = grads[k] * clip
+                m1[k] = np.float32(0.9) * m1[k] + np.float32(0.1) * g
+                m2[k] = np.float32(0.999) * m2[k] + np.float32(0.001) * g * g
+                params[k] -= lr_now * (m1[k] / b1c) / (np.sqrt(m2[k] / b2c) + np.float32(1e-8))
+
+    if not all(np.all(np.isfinite(v)) for v in params.values()):
+        raise ValueError("calibration parameters are not finite")
+
+    p64 = {k: np.round(v.astype(float), 7) for k, v in params.items()}
+    h = x_feat.astype(float)
+    for i in range(n_layers - 1):
+        h = np.tanh(h @ p64[f"w{i}"] + p64[f"b{i}"])
+    corr_all = (h @ p64[f"w{last}"] + p64[f"b{last}"])[:, 0] * y_sd
+    shifts = {}
+    for c in cond_keys:
+        mask = cond_int == c
+        shifts[str(c)] = _best_shift_asym(
+            parent_prediction[mask], corr_all[mask], y[mask], neg_clip, pos_clip,
+            shift_lo=-8.0, shift_hi=8.0,
+        )
+    shift_vec = np.array([shifts.get(str(c), 0.0) for c in cond_int])
+    fitted = _corrected(parent_prediction, corr_all, shift_vec, neg_clip, pos_clip)
+    endpoint_state = _fit_endpoint(fitted, y)
+    return {
+        "version": "res_mlp_v2",
+        "moments": moments,
+        "parent_moments": parent_moments,
+        "cond_keys": cond_keys,
+        "active": active,
+        "p_mu": p_mu,
+        "p_sd": p_sd,
+        "y_sd": y_sd,
+        "n_layers": n_layers,
+        "params": {k: v.tolist() for k, v in p64.items()},
+        "shifts": shifts,
+        "endpoint": endpoint_state,
+        "neg_clip": neg_clip,
+        "pos_clip": pos_clip,
+    }
+
+
 def fit(x, y, parent_prediction, mode="v8"):
     x, y, parent_prediction = _validate_inputs(x, y, parent_prediction)
     if mode == "v8":
@@ -338,6 +534,8 @@ def fit(x, y, parent_prediction, mode="v8"):
         return _fit_spline_v2(x, y, parent_prediction)
     if mode == "res_mlp_v1":
         return _fit_res_mlp_v1(x, y, parent_prediction)
+    if mode == "res_mlp_v2":
+        return _fit_res_mlp_v2(x, y, parent_prediction)
     raise ValueError(f"unsupported calibration mode: {mode}")
 
 
@@ -400,6 +598,39 @@ def _predict_res_mlp_v1(x, parent_prediction, state):
     return result
 
 
+def _predict_res_mlp_v2(x, parent_prediction, state):
+    conditions = np.rint(x[:, 21])
+    z, known = _normalized(x, conditions, state["moments"])
+    cond_keys = [int(c) for c in state["cond_keys"]]
+    ck_map = {c: idx for idx, c in enumerate(cond_keys)}
+    cond_int = np.where(np.isfinite(conditions), conditions, 0.0).astype(int)
+    coh = np.zeros((len(x), len(cond_keys)), dtype=float)
+    for c in cond_keys:
+        coh[cond_int == c, ck_map[c]] = 1.0
+    p_norm_g = np.clip((parent_prediction - float(state["p_mu"])) / float(state["p_sd"]), -5.0, 6.0)[:, None]
+    p_norm_c = _parent_norm(parent_prediction, conditions, state.get("parent_moments"))[:, None]
+    h = np.column_stack([z[:, state["active"]], coh, p_norm_g, p_norm_c])
+    params = state["params"]
+    n_layers = int(state["n_layers"])
+    for i in range(n_layers - 1):
+        h = np.tanh(h @ np.asarray(params[f"w{i}"], dtype=float) + np.asarray(params[f"b{i}"], dtype=float))
+    last = n_layers - 1
+    correction = (
+        h @ np.asarray(params[f"w{last}"], dtype=float) + np.asarray(params[f"b{last}"], dtype=float)
+    )[:, 0] * float(state["y_sd"])
+    shifts = state.get("shifts", {})
+    shift = np.array([shifts.get(str(int(c)), 0.0) for c in cond_int[known]])
+    result = np.maximum(0.0, parent_prediction)
+    result[known] = _corrected(
+        parent_prediction[known], correction[known], shift,
+        neg_clip=state["neg_clip"], pos_clip=state["pos_clip"],
+    )
+    endpoint = state.get("endpoint")
+    if endpoint and endpoint.get("enabled") and np.any(known):
+        result[known] = np.maximum(0.0, result[known] + _endpoint_offsets(result[known], endpoint))
+    return result
+
+
 def predict(x, parent_prediction, state):
     x = np.asarray(x, dtype=float)
     parent_prediction = np.asarray(parent_prediction, dtype=float).reshape(-1)
@@ -410,4 +641,6 @@ def predict(x, parent_prediction, state):
         return _predict_spline_v2(x, parent_prediction, state)
     if version == "res_mlp_v1":
         return _predict_res_mlp_v1(x, parent_prediction, state)
+    if version == "res_mlp_v2":
+        return _predict_res_mlp_v2(x, parent_prediction, state)
     raise ValueError(f"unsupported calibration state version: {version}")

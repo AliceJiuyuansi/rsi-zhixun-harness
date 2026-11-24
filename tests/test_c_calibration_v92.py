@@ -36,15 +36,22 @@ class CalibrationV92Tests(unittest.TestCase):
     def test_release_and_override_mode_selection(self):
         self.assertTrue(calibration_enabled("0.9.1"))
         self.assertTrue(calibration_enabled("0.9.2"))
+        self.assertTrue(calibration_enabled("0.14"))
         self.assertEqual(calibration_mode("0.9"), "v8")
         self.assertEqual(calibration_mode("0.9.1"), "spline_v2")
         self.assertEqual(calibration_mode("0.9.2"), "res_mlp_v1")
+        self.assertEqual(calibration_mode("0.14"), "res_mlp_v2")
+        self.assertEqual(calibration_mode("0.14", "res_mlp_v1"), "res_mlp_v1")
         self.assertEqual(calibration_mode("0.9.2", "spline_v2"), "spline_v2")
         self.assertEqual(calibration_mode("0.9.1", "v8"), "v8")
 
     def test_spline_v2_and_res_mlp_v1_bounds_fallback_and_roundtrip(self):
         x, y, parent = _synthetic()
-        for mode, neg_clip, pos_clip in (("spline_v2", 80.0, 40.0), ("res_mlp_v1", 120.0, 42.0)):
+        for mode, neg_clip, pos_clip in (
+            ("spline_v2", 80.0, 40.0),
+            ("res_mlp_v1", 120.0, 42.0),
+            ("res_mlp_v2", 128.0, 50.0),
+        ):
             with self.subTest(mode=mode):
                 state = fit(x, y, parent, mode=mode)
                 self.assertEqual(state["version"], mode)
@@ -57,9 +64,13 @@ class CalibrationV92Tests(unittest.TestCase):
                 self.assertTrue(np.all(diff >= -neg_clip - 1e-9))
 
                 # Unseen condition falls back to non-negative parent prediction
+                # even when endpoint correction is enabled (v14 fix over v13).
                 unseen = x[:8].copy()
                 unseen[:, 21] = 999
-                fb = predict(unseen, parent[:8], loaded)
+                fb_state = dict(loaded)
+                if mode == "res_mlp_v2":
+                    fb_state["endpoint"] = {"p20": 10.0, "p80": 100.0, "low": -4.0, "high": 6.0, "enabled": True}
+                fb = predict(unseen, parent[:8], fb_state)
                 np.testing.assert_allclose(fb, np.maximum(0.0, parent[:8]), rtol=0, atol=1e-12)
 
                 # Batch vs single-row parity
@@ -71,7 +82,7 @@ class CalibrationV92Tests(unittest.TestCase):
         x, y, _ = _synthetic(rows=200, seed=19)
         paths = [f"f{i}" for i in range(24)]
         base = Model("regression", paths, [], x, y, hidden=8, seed=5)
-        for mode in ("spline_v2", "res_mlp_v1"):
+        for mode in ("spline_v2", "res_mlp_v1", "res_mlp_v2"):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 (root / "parent").mkdir()
@@ -92,7 +103,7 @@ class CalibrationV92Tests(unittest.TestCase):
     def test_nonfinite_rejected_for_new_modes(self):
         x, y, parent = _synthetic(rows=100)
         x[0, 21] = np.nan
-        for mode in ("spline_v2", "res_mlp_v1"):
+        for mode in ("spline_v2", "res_mlp_v1", "res_mlp_v2"):
             with self.subTest(mode=mode), self.assertRaises(ValueError):
                 fit(x, y, parent, mode=mode)
 
@@ -112,6 +123,19 @@ class CalibrationV92Tests(unittest.TestCase):
         # Slight RMSE regression is still blocked even if NASA drops
         worse_rmse = {"rmse": 50.50, "nasa_log1p": 23.00}
         self.assertFalse(acceptance(before, worse_rmse, "regression", "C")["promote"])
+
+    def test_cmapss_group_extraction_from_meta_and_id(self):
+        from vendor.contest_baselines.data import read_dataset
+
+        rows = [
+            {"id": "cmapss_u1_c1", "inputs": [1.0, 2.0], "answer": 10.0, "meta": {"source_subset": "FD002"}},
+            {"id": "cmapss_fd004_u2_c3", "inputs": [1.0, 2.0], "answer": 20.0},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "c.jsonl"
+            p.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+            ds = read_dataset(p, "regression")
+        self.assertEqual(ds["groups"], ["FD002", "FD004"])
 
 
 if __name__ == "__main__":
