@@ -65,7 +65,7 @@ def read_dataset(path, task, classes=None, expected_paths=None):
     if not path.is_file() or path.is_symlink() or path.stat().st_size > MAX_BYTES:
         raise ValueError("dataset must be a regular JSONL file no larger than 128 MiB")
     raw = path.read_bytes()
-    ids, features, targets = [], [], []
+    ids, features, targets, groups = [], [], [], []
     seen = set()
     paths = expected_paths
     for number, line in enumerate(raw.decode("utf-8").splitlines(), 1):
@@ -94,8 +94,15 @@ def read_dataset(path, task, classes=None, expected_paths=None):
         else:
             raise ValueError("unsupported task")
         ids.append(identity); seen.add(identity); features.append(values); targets.append(target)
+        # 仅用于验证分组报告，不进入输入特征或标准化。
+        meta = row.get("meta")
+        group = meta.get("bearing") if isinstance(meta, dict) else None
+        if not isinstance(group, str) or not group.strip():
+            match = re.fullmatch(r"xjtu_(Bearing\d+_\d+)_s\d+", identity)
+            group = match.group(1) if match else None
+        groups.append(group)
     if not ids:
         raise ValueError("dataset is empty")
     return {"ids": ids, "x": np.asarray(features, dtype=np.float64),
             "y": np.asarray(targets, dtype=np.int64 if task == "classification" else np.float64),
-            "paths": paths, "sha256": sha256(raw)}
+            "paths": paths, "sha256": sha256(raw), "groups": groups}

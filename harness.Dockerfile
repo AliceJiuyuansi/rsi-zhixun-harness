@@ -8,17 +8,17 @@
 # (cross-round drift reference, history read-back, model verdict, stall rule,
 #  and the Gatekeeper's whitelist/budget/bounds/kill-switch).
 #
-#   docker build -f harness.Dockerfile -t zhixun-rsi-harness:0.6 .
-#   docker run --rm --network none zhixun-rsi-harness:0.6 describe
+#   docker build -f harness.Dockerfile -t zhixun-rsi-harness:0.7.1 .
+#   docker run --rm --network none zhixun-rsi-harness:0.7.1 describe
 FROM python:3.11-slim
 
-ARG RSI_RELEASE=0.6
+ARG RSI_RELEASE=0.7.1
 LABEL org.opencontainers.image.title="zhixun-rsi-harness" \
       org.opencontainers.image.version="${RSI_RELEASE}" \
       org.opencontainers.image.description="Contest 9 harness: offline continuation + drift-gated updates"
 
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-ARG RSI_C_CALIBRATION=0
+ARG RSI_C_CALIBRATION=1
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \

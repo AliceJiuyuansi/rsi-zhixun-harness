@@ -165,16 +165,7 @@ class Model:
                 # A malformed/unseen calibration must never fail the whole
                 # prediction; the parent MLP output is a safe fallback.
                 pass
-        # v7 keeps v5's unbounded regression output for validation and serving.
-        if os.environ.get("RSI_RELEASE") == "0.7":
-            return prediction
-        # Use the same limit for checkpoint evaluation and single-sample serving.
-        # Identify the contest schema so unrelated regression models retain their range.
-        paths = self.meta["paths"]
-        if len(paths) == 24 and paths[0] == '[["key","sensors"],["index",0]]':
-            return np.minimum(prediction, 260.0)
-        if len(paths) == 34 and paths[0] == '[["key","features"],["key","horizontal"],["key","band1_energy_0_2k"]]':
-            return np.minimum(prediction, 1200.0)
+        # v7.1 固定为非负、无上限；同一检查点不能随宿主环境改变预测。
         return prediction
 
     def save(self, path):
