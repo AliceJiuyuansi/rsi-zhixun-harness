@@ -66,13 +66,15 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 版本号用于交付记录；预测策略仍随检查点保存。
-RELEASE = os.environ.get("RSI_RELEASE", "0.14")
+RELEASE = os.environ.get("RSI_RELEASE", "0.15")
+RES_MLP_V2_RELEASES = ("0.14", "0.15")
+PAIRED_RELEASES = ("0.9", "0.9.1", "0.9.2") + RES_MLP_V2_RELEASES
 
 
 def calibration_enabled(release, override=None):
     """显式0/1优先；未指定时采用对应版本默认值。"""
     if override is None:
-        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2", "0.14")
+        return release in ("0.7", "0.7.1", "0.8") + PAIRED_RELEASES
     return override.strip().lower() not in ("0", "false", "no", "off", "")
 
 
@@ -86,7 +88,7 @@ def calibration_mode(release, override=None):
         return "spline_v2"
     if release == "0.9.2":
         return "res_mlp_v1"
-    if release == "0.14":
+    if release in RES_MLP_V2_RELEASES:
         return "res_mlp_v2"
     return "v8"
 
@@ -153,7 +155,17 @@ def _metric_state(previous: dict, before: dict, task: str) -> dict:
     }
 
 
-def _model_prompt(payload: dict) -> str:
+def _model_prompt(payload: dict, *, compact: bool = False) -> str:
+    if compact:
+        state = {key: value for key, value in payload.items() if key != "history_evidence"}
+        state["rule_budget"] = {key: payload["rule_budget"][key]
+                                for key in ("action", "epochs", "lr", "rule")}
+        return (
+            '/no_think\n根据状态和规则预算，仅输出一行 JSON。保持父模型时输出 '
+            '{"decision":"hold"}。训练时填写 decision="train"、epochs 和 lr。'
+            '优先沿用规则值，有依据时可减少轮数。\n'
+            + json.dumps(state, ensure_ascii=False, separators=(",", ":"))
+        )
     return (
         "/no_think\n"
         "你是工业模型自进化系统的决策器。下面是一轮的真实状态（JSON）。\n"
@@ -253,8 +265,11 @@ def train(rnd) -> None:
         "last_gain": history["last_gain"], "stalled": history["stalled"],
         "rule_budget": budget,
     }
+    compact_prompt = RELEASE == "0.15"
+    model_options = {"max_tokens": 256, "enable_thinking": False} if compact_prompt else {}
     decision, model_text, model_diagnostics = decide_with_receipt(
-        rnd, _model_prompt(model_state), budget, history, int(rnd.round_index))
+        rnd, _model_prompt(model_state, compact=compact_prompt), budget, history,
+        int(rnd.round_index), **model_options)
     audit.write("model_receipt", step=int(rnd.round_index), **model_diagnostics)
     # The host may start with an older state. Recover its spent budget from the
     # platform's round records before assigning the next request.
@@ -312,11 +327,11 @@ def train(rnd) -> None:
     outcome = None
     calibrate_c = (C_CALIBRATION_ENABLED and rnd.dataset_key == "C"
                    and task == "regression" and len(feature_paths) == 24)
+    use_paired = RELEASE in PAIRED_RELEASES
     if int(decision["epochs"]) > 0:
         try:
             log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
                           f"calibrate_c={calibrate_c} mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
-            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14")
             round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
@@ -523,7 +538,7 @@ def train(rnd) -> None:
                            "candidate": {k: round_result.metrics_after[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_after},
                            "smoothing": round_result.config["weight_smoothing"],
                            "component_cpu_seconds": round_result.config["component_cpu_seconds"],
-                       }} if RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14") and round_result is not None else {}),
+                       }} if use_paired and round_result is not None else {}),
                        "accepted": bool(outcome and outcome.get("accepted")),
                        "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
                        "promoted": promoted, "gain": None if not outcome else outcome["gain"],

@@ -6,17 +6,22 @@ from src.harness.round_controller import (
 )
 
 
-def decide_with_receipt(rnd, prompt, budget, history, round_index):
+def decide_with_receipt(rnd, prompt, budget, history, round_index, *, max_tokens=768,
+                        enable_thinking=None):
     diagnostics = {"status": "call_error", "error_type": "", "finish_reason": "",
                    "response_keys": [], "text_source": "", "text_chars": 0, "max_tokens": None}
     summary = ""
     verdict = None
     try:
-        limit = min(768, int(getattr(rnd, "max_output_tokens", 768) or 768))
+        limit = min(max_tokens, int(getattr(rnd, "max_output_tokens", max_tokens) or max_tokens))
         if limit <= 0:
             raise ValueError
         diagnostics["max_tokens"] = limit
-        receipt = rnd.model([{"role": "user", "content": prompt}], max_tokens=limit, temperature=0)
+        options = {"max_tokens": limit, "temperature": 0}
+        if enable_thinking is not None:
+            options["enable_thinking"] = enable_thinking
+            diagnostics["enable_thinking"] = enable_thinking
+        receipt = rnd.model([{"role": "user", "content": prompt}], **options)
         response = receipt.response
         if isinstance(response, dict):
             diagnostics["response_keys"] = sorted(str(k) for k in response)[:20]

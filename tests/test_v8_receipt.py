@@ -76,6 +76,30 @@ class ReceiptTests(unittest.TestCase):
                 _, _, diag = self.decide('', 'length', **quota)
                 self.assertEqual((diag['max_tokens'], diag['status']), (expected, 'empty'))
 
+    def test_compact_prompt_retains_decision_inputs(self):
+        payload = {'round': 4, 'history': [{'round': 3, 'gain': 0.01}],
+                   'history_evidence': 'duplicate history', 'rule_budget': RULE}
+        prompt = _model_prompt(payload, compact=True)
+        self.assertTrue(prompt.startswith('/no_think\n'))
+        self.assertLess(len(prompt), len(_model_prompt(payload)))
+        state = json.loads(prompt.splitlines()[-1])
+        self.assertNotIn('history_evidence', state)
+        self.assertEqual(state['history'], payload['history'])
+        self.assertEqual(state['rule_budget'], {k: RULE[k] for k in ('action', 'epochs', 'lr', 'rule')})
+
+    def test_non_thinking_call_respects_host_quota_then_uses_rule_on_empty(self):
+        response = {'choices': [{'message': {'content': ''}, 'finish_reason': 'length'}]}
+        for quota, expected in ((1024, 256), (96, 96)):
+            with self.subTest(quota=quota):
+                model = Mock(return_value=SimpleNamespace(response=response))
+                rnd = SimpleNamespace(model=model, max_output_tokens=quota)
+                decision, _, diag = decide_with_receipt(
+                    rnd, 'prompt', RULE, {}, 4, max_tokens=256, enable_thinking=False)
+                model.assert_called_once_with([{'role': 'user', 'content': 'prompt'}],
+                                              max_tokens=expected, temperature=0, enable_thinking=False)
+                self.assertEqual((diag['status'], diag['max_tokens']), ('empty', expected))
+                self.assertEqual((decision['source'], decision['epochs'], decision['lr']), ('rule', 3, .0015))
+
 
 if __name__ == '__main__':
     unittest.main()
