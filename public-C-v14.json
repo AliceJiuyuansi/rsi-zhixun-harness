@@ -1,0 +1,854 @@
+{
+  "purpose": "public real-training local wiring; not SDK or platform",
+  "dataset": "C",
+  "rounds": [
+    {
+      "round": 1,
+      "epochs": 3,
+      "promoted": true,
+      "metrics": {
+        "mae": 33.77551835013426,
+        "rmse": 46.858641522412995,
+        "nasa": 918110635.8532178,
+        "nasa_log1p": 20.63782846077083,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:abc3910cf9069258257502fd0341be8cf7306401c2557f043392dfc694ec862f",
+      "configuration": {
+        "execution": {
+          "status": "promoted",
+          "epochs_requested": 3,
+          "epochs_executed": 3,
+          "candidate_available": true,
+          "promoted": true,
+          "skip_reason": null,
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "first_round",
+        "action": "finetune",
+        "epochs": 3,
+        "lr": 0.002,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": true,
+        "data_grew": true,
+        "history": [],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "selection_audit": {
+          "validation_sha256": "sha256:0cc747f9998c5d7ee1e4eac6aec0db9f5ed4d2de149a1b1cbe689cce6b6aaca7",
+          "parent": {
+            "rmse": 52.86857256611151,
+            "nasa_log1p": 22.485156873691214
+          },
+          "candidate": {
+            "rmse": 46.858641522412995,
+            "nasa_log1p": 20.63782846077083
+          },
+          "smoothing": "kept_original",
+          "component_cpu_seconds": {
+            "fit": 0.96875,
+            "calibration": 6.421875,
+            "validation": 0.359375,
+            "smoothed_calibration": 2.984375,
+            "smoothed_validation": 0.1875
+          }
+        },
+        "accepted": true,
+        "calibrate_c": true,
+        "promoted": true,
+        "gain": 0.113677,
+        "gate": true
+      }
+    },
+    {
+      "round": 2,
+      "epochs": 3,
+      "promoted": true,
+      "metrics": {
+        "mae": 33.343329647769764,
+        "rmse": 46.70809153695786,
+        "nasa": 921896291.0197045,
+        "nasa_log1p": 20.641943293653895,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:dbd2f6f4b2a703b94b381af9671c8de9021d039a60f3333af45647b59eaaebd6",
+      "configuration": {
+        "execution": {
+          "status": "promoted",
+          "epochs_requested": 3,
+          "epochs_executed": 3,
+          "candidate_available": true,
+          "promoted": true,
+          "skip_reason": null,
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "calibration",
+        "action": "finetune",
+        "epochs": 3,
+        "lr": 0.001,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 1,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.113677,
+            "value": 46.858642
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "selection_audit": {
+          "validation_sha256": "sha256:0cc747f9998c5d7ee1e4eac6aec0db9f5ed4d2de149a1b1cbe689cce6b6aaca7",
+          "parent": {
+            "rmse": 46.858641522412995,
+            "nasa_log1p": 20.63782846077083
+          },
+          "candidate": {
+            "rmse": 46.70809153695786,
+            "nasa_log1p": 20.641943293653895
+          },
+          "smoothing": "kept_original",
+          "component_cpu_seconds": {
+            "fit": 0.875,
+            "calibration": 6.109375,
+            "validation": 0.5,
+            "smoothed_calibration": 3.03125,
+            "smoothed_validation": 0.140625
+          }
+        },
+        "accepted": true,
+        "calibrate_c": true,
+        "promoted": true,
+        "gain": 0.003213,
+        "gate": true
+      }
+    },
+    {
+      "round": 3,
+      "epochs": 3,
+      "promoted": true,
+      "metrics": {
+        "mae": 33.433625001392286,
+        "rmse": 46.61442837667064,
+        "nasa": 802992787.831574,
+        "nasa_log1p": 20.503856291586246,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+      "configuration": {
+        "execution": {
+          "status": "promoted",
+          "epochs_requested": 3,
+          "epochs_executed": 3,
+          "candidate_available": true,
+          "promoted": true,
+          "skip_reason": null,
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "calibration",
+        "action": "finetune",
+        "epochs": 3,
+        "lr": 0.001,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 1,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.113677,
+            "value": 46.858642
+          },
+          {
+            "round": 2,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.003213,
+            "value": 46.708092
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "selection_audit": {
+          "validation_sha256": "sha256:0cc747f9998c5d7ee1e4eac6aec0db9f5ed4d2de149a1b1cbe689cce6b6aaca7",
+          "parent": {
+            "rmse": 46.70809153695786,
+            "nasa_log1p": 20.641943293653895
+          },
+          "candidate": {
+            "rmse": 46.61442837667064,
+            "nasa_log1p": 20.503856291586246
+          },
+          "smoothing": "selected",
+          "component_cpu_seconds": {
+            "fit": 0.984375,
+            "calibration": 9.65625,
+            "validation": 0.609375,
+            "smoothed_calibration": 3.34375,
+            "smoothed_validation": 0.15625
+          }
+        },
+        "accepted": true,
+        "calibrate_c": true,
+        "promoted": true,
+        "gain": 0.002005,
+        "gate": true
+      }
+    },
+    {
+      "round": 4,
+      "epochs": 3,
+      "promoted": false,
+      "metrics": {
+        "mae": 33.433625001392286,
+        "rmse": 46.61442837667064,
+        "nasa": 802992787.831574,
+        "nasa_log1p": 20.503856291586246,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+      "configuration": {
+        "execution": {
+          "status": "trained_rejected",
+          "epochs_requested": 3,
+          "epochs_executed": 3,
+          "candidate_available": true,
+          "promoted": false,
+          "skip_reason": null,
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "calibration",
+        "action": "finetune",
+        "epochs": 3,
+        "lr": 0.001,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 1,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.113677,
+            "value": 46.858642
+          },
+          {
+            "round": 2,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.003213,
+            "value": 46.708092
+          },
+          {
+            "round": 3,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.002005,
+            "value": 46.614428
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "selection_audit": {
+          "validation_sha256": "sha256:0cc747f9998c5d7ee1e4eac6aec0db9f5ed4d2de149a1b1cbe689cce6b6aaca7",
+          "parent": {
+            "rmse": 46.61442837667064,
+            "nasa_log1p": 20.503856291586246
+          },
+          "candidate": {
+            "rmse": 46.643146762152476,
+            "nasa_log1p": 20.57719410428994
+          },
+          "smoothing": "kept_original",
+          "component_cpu_seconds": {
+            "fit": 0.90625,
+            "calibration": 6.625,
+            "validation": 0.53125,
+            "smoothed_calibration": 2.984375,
+            "smoothed_validation": 0.125
+          }
+        },
+        "accepted": false,
+        "calibrate_c": true,
+        "promoted": false,
+        "gain": -0.000616,
+        "gate": true
+      }
+    },
+    {
+      "round": 5,
+      "epochs": 0,
+      "promoted": false,
+      "metrics": {
+        "mae": 33.433625001392286,
+        "rmse": 46.61442837667064,
+        "nasa": 802992787.831574,
+        "nasa_log1p": 20.503856291586246,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+      "configuration": {
+        "execution": {
+          "status": "skipped",
+          "epochs_requested": 0,
+          "epochs_executed": 0,
+          "candidate_available": false,
+          "promoted": false,
+          "skip_reason": "quiet",
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "quiet",
+        "action": "none",
+        "epochs": 0,
+        "lr": 0.0,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 2,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.003213,
+            "value": 46.708092
+          },
+          {
+            "round": 3,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.002005,
+            "value": 46.614428
+          },
+          {
+            "round": 4,
+            "decision": "retain",
+            "epochs": 3,
+            "gain": -0.000616,
+            "value": 46.614428
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "accepted": false,
+        "calibrate_c": false,
+        "promoted": false,
+        "gain": null,
+        "gate": true
+      }
+    },
+    {
+      "round": 6,
+      "epochs": 0,
+      "promoted": false,
+      "metrics": {
+        "mae": 33.433625001392286,
+        "rmse": 46.61442837667064,
+        "nasa": 802992787.831574,
+        "nasa_log1p": 20.503856291586246,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+      "configuration": {
+        "execution": {
+          "status": "skipped",
+          "epochs_requested": 0,
+          "epochs_executed": 0,
+          "candidate_available": false,
+          "promoted": false,
+          "skip_reason": "quiet",
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "quiet",
+        "action": "none",
+        "epochs": 0,
+        "lr": 0.0,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 3,
+            "decision": "promote",
+            "epochs": 3,
+            "gain": 0.002005,
+            "value": 46.614428
+          },
+          {
+            "round": 4,
+            "decision": "retain",
+            "epochs": 3,
+            "gain": -0.000616,
+            "value": 46.614428
+          },
+          {
+            "round": 5,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "accepted": false,
+        "calibrate_c": false,
+        "promoted": false,
+        "gain": null,
+        "gate": true
+      }
+    },
+    {
+      "round": 7,
+      "epochs": 0,
+      "promoted": false,
+      "metrics": {
+        "mae": 33.433625001392286,
+        "rmse": 46.61442837667064,
+        "nasa": 802992787.831574,
+        "nasa_log1p": 20.503856291586246,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+      "configuration": {
+        "execution": {
+          "status": "skipped",
+          "epochs_requested": 0,
+          "epochs_executed": 0,
+          "candidate_available": false,
+          "promoted": false,
+          "skip_reason": "quiet",
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "quiet",
+        "action": "none",
+        "epochs": 0,
+        "lr": 0.0,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 4,
+            "decision": "retain",
+            "epochs": 3,
+            "gain": -0.000616,
+            "value": 46.614428
+          },
+          {
+            "round": 5,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          },
+          {
+            "round": 6,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "accepted": false,
+        "calibrate_c": false,
+        "promoted": false,
+        "gain": null,
+        "gate": true
+      }
+    },
+    {
+      "round": 8,
+      "epochs": 0,
+      "promoted": false,
+      "metrics": {
+        "mae": 33.433625001392286,
+        "rmse": 46.61442837667064,
+        "nasa": 802992787.831574,
+        "nasa_log1p": 20.503856291586246,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+      "configuration": {
+        "execution": {
+          "status": "skipped",
+          "epochs_requested": 0,
+          "epochs_executed": 0,
+          "candidate_available": false,
+          "promoted": false,
+          "skip_reason": "quiet",
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "quiet",
+        "action": "none",
+        "epochs": 0,
+        "lr": 0.0,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 5,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          },
+          {
+            "round": 6,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          },
+          {
+            "round": 7,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "accepted": false,
+        "calibrate_c": false,
+        "promoted": false,
+        "gain": null,
+        "gate": true
+      }
+    },
+    {
+      "round": 9,
+      "epochs": 0,
+      "promoted": false,
+      "metrics": {
+        "mae": 33.433625001392286,
+        "rmse": 46.61442837667064,
+        "nasa": 802992787.831574,
+        "nasa_log1p": 20.503856291586246,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+      "configuration": {
+        "execution": {
+          "status": "skipped",
+          "epochs_requested": 0,
+          "epochs_executed": 0,
+          "candidate_available": false,
+          "promoted": false,
+          "skip_reason": "quiet",
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "quiet",
+        "action": "none",
+        "epochs": 0,
+        "lr": 0.0,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 6,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          },
+          {
+            "round": 7,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          },
+          {
+            "round": 8,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "accepted": false,
+        "calibrate_c": false,
+        "promoted": false,
+        "gain": null,
+        "gate": true
+      }
+    },
+    {
+      "round": 10,
+      "epochs": 0,
+      "promoted": false,
+      "metrics": {
+        "mae": 33.433625001392286,
+        "rmse": 46.61442837667064,
+        "nasa": 802992787.831574,
+        "nasa_log1p": 20.503856291586246,
+        "nasa_saturated": false
+      },
+      "checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+      "configuration": {
+        "execution": {
+          "status": "skipped",
+          "epochs_requested": 0,
+          "epochs_executed": 0,
+          "candidate_available": false,
+          "promoted": false,
+          "skip_reason": "quiet",
+          "epoch_budget": null,
+          "override": null
+        },
+        "rule": "quiet",
+        "action": "none",
+        "epochs": 0,
+        "lr": 0.0,
+        "psi_prev": 0.0,
+        "psi_baseline": 0.0,
+        "psi_holdout": 0.0076,
+        "pred_js": 0.0,
+        "rows": {
+          "train": 113089,
+          "validation": 23049
+        },
+        "stage_changed": false,
+        "data_grew": false,
+        "history": [
+          {
+            "round": 7,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          },
+          {
+            "round": 8,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          },
+          {
+            "round": 9,
+            "decision": "retain",
+            "epochs": 0,
+            "gain": null,
+            "value": 46.614428
+          }
+        ],
+        "model_action": "unavailable",
+        "source": "rule",
+        "model_receipt": {
+          "status": "empty",
+          "error_type": "",
+          "finish_reason": "",
+          "response_keys": [],
+          "text_source": "",
+          "text_chars": 0,
+          "max_tokens": 256,
+          "changed_rule": false
+        },
+        "release": "0.14",
+        "prediction_policy": "nonnegative_unbounded",
+        "accepted": false,
+        "calibrate_c": false,
+        "promoted": false,
+        "gain": null,
+        "gate": true
+      }
+    }
+  ],
+  "rows": 23049,
+  "batch_prediction_sha256": "4cccd579c23e8c28754b03b038dfc82b1d0edf522cefa66661dc9dcba8bb65d5",
+  "single_vs_batch_max_delta": 1.9895196601282805e-13,
+  "selected_checkpoint_sha256": "sha256:9b64b6a078c5e1fba3ed34d3f080b89f7d91aed80ab187e6246a57a9832a37e1",
+  "validation_sha256": "sha256:0cc747f9998c5d7ee1e4eac6aec0db9f5ed4d2de149a1b1cbe689cce6b6aaca7"
+}
