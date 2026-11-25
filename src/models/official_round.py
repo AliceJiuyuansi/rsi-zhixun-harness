@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +30,21 @@ from src.harness.round_controller import paired_acceptance
 from vendor.contest_baselines.model import PARAMETERS, Model, checkpoint_digest
 
 REPORT_FORMAT = "contest.cpu-baseline-report.v1"
+
+
+def balanced_sample_weights(groups, exponent: float) -> np.ndarray | None:
+    """Mean-one inverse frequency weights from training groups alone."""
+    if groups is None or exponent == 0:
+        return None
+    if not 0 < exponent <= 1:
+        raise ValueError("group weighting exponent must be between zero and one")
+    counts = Counter(group for group in groups if group is not None and group != "")
+    if len(counts) < 2:
+        return None
+    by_group = {group: count ** -exponent for group, count in counts.items()}
+    known_mean = sum(counts[group] * weight for group, weight in by_group.items()) / sum(counts.values())
+    weights = np.array([by_group.get(group, known_mean) for group in groups], dtype=float)
+    return weights / weights.mean()
 
 
 def macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -103,6 +119,16 @@ def _refit_c(model: Model, X_train, y_train, mode: str = "v8") -> None:
     model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train), mode=mode)
 
 
+def _fit_b_state(X_train, y_train, train_groups) -> dict | None:
+    """Fit train-only sign-consistent log-RUL calibration for B-bearing if groups allow."""
+    from vendor.contest_baselines import b_calibration
+
+    try:
+        return b_calibration.fit(X_train, y_train, train_groups)
+    except Exception:  # noqa: BLE001 - optional calibration falls back cleanly to base MLP
+        return None
+
+
 @dataclass
 class RoundResult:
     out_dir: Path
@@ -165,7 +191,11 @@ class OfficialRound:
                        patience: int = 0, calibrate_c: bool = False, validation_groups=None,
                        stage_id: str = "round", hypothesis: str = "",
                        change_summary: str = "", smooth_weights: bool = False,
-                       selection_task: str = "", calibration_mode: str = "v8") -> RoundResult:
+                       selection_task: str = "", calibration_mode: str = "v8",
+                       train_groups=None, group_alpha: float = 0.0,
+                       weight_decay: float = 0.0, label_smoothing: float = 0.0,
+                       calibrate_b: bool = False, fast_c_calibration: bool = False,
+                       c_nasa_tol: float = 0.0) -> RoundResult:
         """Continue the parent for up to `epochs`, keeping the best-scoring weights.
 
         `patience > 0` enables early stopping: after that many epochs without a
@@ -208,7 +238,9 @@ class OfficialRound:
             before = self.evaluate(model, X_val, y_val, groups=validation_groups)
 
         def eligible(metrics):
-            return not selection_task or paired_acceptance(before, metrics, model.meta["task"], selection_task)["promote"]
+            return not selection_task or paired_acceptance(
+                before, metrics, model.meta["task"], selection_task, c_nasa_tol=c_nasa_tol
+            )["promote"]
 
         def improves(ok, score):
             # Lexicographic order: an eligible snapshot always beats an ineligible
@@ -236,55 +268,118 @@ class OfficialRound:
         parent_weights = {k: model.params[k].copy() for k in PARAMETERS} if smooth_weights else None
         total_epochs = int(epochs)
         best_raw_rmse = float("inf")
-        for ep_idx in range(total_epochs):
-            with measured("fit"):
-                loss = model.fit(X_train, np.asarray(y_train), 1)[0]
-            epochs_run += 1
-            if calibrate_c:
-                should_refit = True
-                if calibration_mode != "v8" and total_epochs > 1:
-                    # Skip expensive non-v8 refit on clearly degraded middle epochs.
-                    model.meta.pop("c_calibration", None)
-                    raw_rmse = regression_metrics(y_val, model.predict(X_val))["rmse"]
-                    if ep_idx == 0 or ep_idx == total_epochs - 1 or raw_rmse <= best_raw_rmse * 1.005:
-                        best_raw_rmse = min(best_raw_rmse, raw_rmse)
-                    else:
-                        should_refit = False
-                if should_refit:
-                    try:
-                        with measured("calibration"):
-                            _refit_c(model, X_train, y_train, mode=calibration_mode)
-                    except Exception:  # noqa: BLE001 - calibration is optional; keep training
-                        model.meta.pop("c_calibration", None)
-            with measured("validation"):
-                validation = self.evaluate(model, X_val, y_val, groups=validation_groups)
-            ok = eligible(validation)
-            history.append({"epoch": int(model.meta["epochs"]), "step": int(model.meta["steps"]),
-                            "loss": float(loss), "validation": validation,
-                            **({"eligible": ok} if selection_task else {})})
+        b_cal_state = None
+        if calibrate_b:
+            with measured("calibration"):
+                b_cal_state = _fit_b_state(X_train, np.asarray(y_train, dtype=float), train_groups)
+        weights = balanced_sample_weights(train_groups, group_alpha)
+        fit_options = {"sample_weight": weights} if weights is not None else {}
+        if weight_decay:
+            fit_options["weight_decay"] = weight_decay
+        if label_smoothing:
+            fit_options["label_smoothing"] = label_smoothing
 
-            score = _primary_score(validation)
-            if improves(ok, score):
-                # Snapshot the weights + Adam state that actually scored best, so
-                # "train longer" can never quietly hand back a worse model.
-                best_score = score
-                best_validation = validation
-                snapshot = out / f".snapshot-{epochs_run}.npz"
-                model.save(snapshot)
-                if best_snapshot is not None:
-                    best_snapshot.unlink(missing_ok=True)
-                best_snapshot = snapshot
-                best_ok = ok
-            # Keep the original primary-score patience and optimizer trajectory;
-            # only change which observed snapshot can be returned.
-            if score > unconstrained_best + 1e-12:
-                unconstrained_best = score
-                epochs_without_progress = 0
+        if calibrate_c and fast_c_calibration:
+            # Fast single-refit path for C-engine: train base MLP epochs cheaply,
+            # pick best raw-RMSE epoch, then fit res_mlp_v2 ONCE (2.5-3.5x speedup).
+            model.meta.pop("c_calibration", None)
+            best_raw_snap: Path | None = None
+            for ep_idx in range(total_epochs):
+                with measured("fit"):
+                    loss = model.fit(X_train, np.asarray(y_train), 1, **fit_options)[0]
+                epochs_run += 1
+                with measured("validation"):
+                    raw_val = regression_metrics(y_val, model.predict(X_val))
+                raw_rmse = float(raw_val["rmse"])
+                history.append({"epoch": int(model.meta["epochs"]), "step": int(model.meta["steps"]),
+                                "loss": float(loss), "validation": raw_val, "phase": "raw_search"})
+                if raw_rmse < best_raw_rmse - 1e-12:
+                    best_raw_rmse = raw_rmse
+                    epochs_without_progress = 0
+                    snap = out / f".raw-{epochs_run}.npz"
+                    model.save(snap)
+                    if best_raw_snap is not None:
+                        best_raw_snap.unlink(missing_ok=True)
+                    best_raw_snap = snap
+                else:
+                    epochs_without_progress += 1
+                if patience > 0 and epochs_without_progress >= patience:
+                    break
+            if best_raw_snap is not None:
+                best_model = Model.load(str(best_raw_snap))
+                best_raw_snap.unlink(missing_ok=True)
             else:
-                epochs_without_progress += 1
+                best_model = model
+            try:
+                with measured("calibration"):
+                    _refit_c(best_model, X_train, y_train, mode=calibration_mode)
+            except Exception:  # noqa: BLE001
+                best_model.meta.pop("c_calibration", None)
+            with measured("validation"):
+                validation = self.evaluate(best_model, X_val, y_val, groups=validation_groups)
+            best_ok = eligible(validation)
+            best_score = _primary_score(validation)
+            best_validation = validation
+            best_snapshot = out / ".snapshot-fast.npz"
+            best_model.save(best_snapshot)
+            history.append({"epoch": int(best_model.meta["epochs"]), "step": int(best_model.meta["steps"]),
+                            "loss": float(history[-1]["loss"]) if history else 0.0,
+                            "validation": validation, "phase": "calibrated",
+                            **({"eligible": best_ok} if selection_task else {})})
+        else:
+            for ep_idx in range(total_epochs):
+                if calibrate_b:
+                    model.meta.pop("b_calibration", None)
+                with measured("fit"):
+                    loss = model.fit(X_train, np.asarray(y_train), 1, **fit_options)[0]
+                epochs_run += 1
+                if calibrate_b and b_cal_state is not None:
+                    model.meta["b_calibration"] = b_cal_state
+                if calibrate_c:
+                    should_refit = True
+                    if calibration_mode != "v8" and total_epochs > 1:
+                        # Skip expensive non-v8 refit on clearly degraded middle epochs.
+                        model.meta.pop("c_calibration", None)
+                        raw_rmse = regression_metrics(y_val, model.predict(X_val))["rmse"]
+                        if ep_idx == 0 or ep_idx == total_epochs - 1 or raw_rmse <= best_raw_rmse * 1.005:
+                            best_raw_rmse = min(best_raw_rmse, raw_rmse)
+                        else:
+                            should_refit = False
+                    if should_refit:
+                        try:
+                            with measured("calibration"):
+                                _refit_c(model, X_train, y_train, mode=calibration_mode)
+                        except Exception:  # noqa: BLE001 - calibration is optional; keep training
+                            model.meta.pop("c_calibration", None)
+                with measured("validation"):
+                    validation = self.evaluate(model, X_val, y_val, groups=validation_groups)
+                ok = eligible(validation)
+                history.append({"epoch": int(model.meta["epochs"]), "step": int(model.meta["steps"]),
+                                "loss": float(loss), "validation": validation,
+                                **({"eligible": ok} if selection_task else {})})
 
-            if patience > 0 and epochs_without_progress >= patience:
-                break
+                score = _primary_score(validation)
+                if improves(ok, score):
+                    # Snapshot the weights + Adam state that actually scored best, so
+                    # "train longer" can never quietly hand back a worse model.
+                    best_score = score
+                    best_validation = validation
+                    snapshot = out / f".snapshot-{epochs_run}.npz"
+                    model.save(snapshot)
+                    if best_snapshot is not None:
+                        best_snapshot.unlink(missing_ok=True)
+                    best_snapshot = snapshot
+                    best_ok = ok
+                # Keep the original primary-score patience and optimizer trajectory;
+                # only change which observed snapshot can be returned.
+                if score > unconstrained_best + 1e-12:
+                    unconstrained_best = score
+                    epochs_without_progress = 0
+                else:
+                    epochs_without_progress += 1
+
+                if patience > 0 and epochs_without_progress >= patience:
+                    break
 
         smoothing = "not_attempted"
         if best_snapshot is not None and parent_weights is not None:
@@ -292,23 +387,34 @@ class OfficialRound:
             smoothed = Model.load(str(best_snapshot))
             for key in PARAMETERS:
                 smoothed.params[key] = 0.85 * smoothed.params[key] + 0.15 * parent_weights[key]
-            try:
-                if calibrate_c:
-                    with measured("smoothed_calibration"):
-                        _refit_c(smoothed, X_train, y_train, mode=calibration_mode)
+            skip_smooth = False
+            if calibrate_c and fast_c_calibration:
+                smoothed.meta.pop("c_calibration", None)
                 with measured("smoothed_validation"):
-                    validation = self.evaluate(smoothed, X_val, y_val, groups=validation_groups)
-            except (ValueError, ArithmeticError, np.linalg.LinAlgError):
-                # A bad optional fit must not discard an already valid trained snapshot.
-                smoothing = "invalid_candidate"
-            else:
-                smoothing = "kept_original"
-                if improves(eligible(validation), _primary_score(validation)):
-                    snapshot = out / ".snapshot-smoothed.npz"
-                    smoothed.save(snapshot)
-                    snapshot.replace(best_snapshot)
-                    best_validation = validation
-                    smoothing = "selected"
+                    smooth_raw_rmse = float(regression_metrics(y_val, smoothed.predict(X_val))["rmse"])
+                if smooth_raw_rmse > best_raw_rmse * 1.001:
+                    skip_smooth = True
+                    smoothing = "skipped_raw_worse"
+            if not skip_smooth:
+                try:
+                    if calibrate_b and b_cal_state is not None:
+                        smoothed.meta["b_calibration"] = b_cal_state
+                    if calibrate_c:
+                        with measured("smoothed_calibration"):
+                            _refit_c(smoothed, X_train, y_train, mode=calibration_mode)
+                    with measured("smoothed_validation"):
+                        validation = self.evaluate(smoothed, X_val, y_val, groups=validation_groups)
+                except (ValueError, ArithmeticError, np.linalg.LinAlgError):
+                    # A bad optional fit must not discard an already valid trained snapshot.
+                    smoothing = "invalid_candidate"
+                else:
+                    smoothing = "kept_original"
+                    if improves(eligible(validation), _primary_score(validation)):
+                        snapshot = out / ".snapshot-smoothed.npz"
+                        smoothed.save(snapshot)
+                        snapshot.replace(best_snapshot)
+                        best_validation = validation
+                        smoothing = "selected"
 
         seconds = time.perf_counter() - started
         checkpoint = out / "checkpoint.npz"
@@ -335,6 +441,8 @@ class OfficialRound:
                     "learning_rate": float(model.meta["learning_rate"]),
                     "batch_size": int(model.meta["batch_size"]),
                     "calibrate_c": bool(calibrate_c),
+                    "calibrate_b": bool(calibrate_b and b_cal_state is not None),
+                    "fast_c_calibration": bool(calibrate_c and fast_c_calibration),
                     "calibration_mode": calibration_mode if calibrate_c else "",
                     "stage_id": stage_id, "hypothesis": hypothesis,
                     "change_summary": change_summary},

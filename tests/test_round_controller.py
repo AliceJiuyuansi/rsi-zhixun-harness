@@ -130,6 +130,27 @@ class HistoryTests(unittest.TestCase):
 
 
 class BudgetTests(unittest.TestCase):
+    def test_b_recovers_from_stall_on_both_drift_and_error(self):
+        signals = dict(dataset_key="B", task="regression", round_index=6,
+                       psi_prev=0.8, psi_holdout=0.01, data_grew=False,
+                       stage_changed=False, gap=0.015, history={"stalled": 2})
+        self.assertEqual(choose_budget(**signals)["rule"], "stalled")
+        budget = choose_budget(**signals, recover_stalled_b=True)
+        self.assertEqual((budget["rule"], budget["epochs"]), ("b_drift_recovery", 2))
+        self.assertEqual(apply_verdict(budget, {"action": "hold"}, {}, 6)["epochs"], 2)
+        self.assertEqual(apply_verdict(budget, {"action": "rollback"}, {}, 6)["epochs"], 0)
+
+    def test_b_recovery_requires_joint_signal_and_respects_kill_switch(self):
+        signals = dict(dataset_key="B", task="regression", round_index=6,
+                       psi_prev=0.8, psi_holdout=0.01, data_grew=False,
+                       stage_changed=False, gap=0.015, history={"stalled": 2},
+                       recover_stalled_b=True)
+        for change, expected in (({"psi_prev": 0.1}, "stalled"), ({"gap": 0.0}, "stalled"),
+                                 ({"history": {"stalled": 2, "kill_switch": True}}, "kill_switch")):
+            with self.subTest(change=change):
+                budget = choose_budget(**{**signals, **change})
+                self.assertEqual((budget["rule"], budget["epochs"]), (expected, 0))
+
     def test_first_round_always_trains(self):
         budget = choose_budget(dataset_key="A", task="classification", round_index=1,
                                psi_prev=0.0, psi_holdout=2.0, data_grew=False,

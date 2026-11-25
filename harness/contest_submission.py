@@ -35,6 +35,12 @@ if str(PLATFORM_APP_DIR) not in sys.path:
     sys.path.insert(0, str(PLATFORM_APP_DIR))
 
 from src.harness.guard import Gatekeeper  # noqa: E402
+from src.harness.late_budget import (  # noqa: E402
+    execution_record,
+    pace_c_budget,
+    plan_c_budget,
+    protect_c_attempt,
+)
 from src.harness.model_receipt import decide_with_receipt  # noqa: E402
 from src.harness.round_controller import (  # noqa: E402
     acceptance,
@@ -66,8 +72,12 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 版本号用于交付记录；预测策略仍随检查点保存。
-RELEASE = os.environ.get("RSI_RELEASE", "0.15")
-RES_MLP_V2_RELEASES = ("0.14", "0.15")
+RELEASE = os.environ.get("RSI_RELEASE", "0.17")
+ULTRA_COMPACT_RELEASES = ("0.17",)
+B_CALIBRATION_RELEASES = ("0.17",)
+C_LATE_BUDGET_RELEASES = ("0.17",)
+COMPACT_MODEL_RELEASES = ("0.15", "0.16") + ULTRA_COMPACT_RELEASES
+RES_MLP_V2_RELEASES = ("0.14",) + COMPACT_MODEL_RELEASES
 PAIRED_RELEASES = ("0.9", "0.9.1", "0.9.2") + RES_MLP_V2_RELEASES
 
 
@@ -155,7 +165,31 @@ def _metric_state(previous: dict, before: dict, task: str) -> dict:
     }
 
 
-def _model_prompt(payload: dict, *, compact: bool = False) -> str:
+def _model_prompt(payload: dict, *, compact: bool = False, ultra_compact: bool = False) -> str:
+    if ultra_compact:
+        rows = payload.get("rows") or {}
+        drift = payload.get("drift") or {}
+        rb = payload.get("rule_budget") or {}
+        tiny = {
+            "d": payload.get("dataset"),
+            "r": payload.get("round"),
+            "st": payload.get("stage"),
+            "m": round(float(payload.get("parent", 0.0)), 4),
+            "best": round(float(payload.get("best", 0.0)), 4),
+            "gap": round(float(payload.get("gap", 0.0)), 4),
+            "psi": round(float(drift.get("psi_vs_previous", 0.0)), 3),
+            "chg": int(bool(rows.get("stage_changed"))),
+            "grow": int(bool(rows.get("train_grew"))),
+            "stl": int(payload.get("stalled", 0)),
+            "lg": round(float(payload.get("last_gain", 0.0)), 4),
+            "act": rb.get("action"),
+            "ep": int(rb.get("epochs", 0)),
+            "lr": rb.get("lr", 0.0),
+        }
+        return (
+            '/no_think\n仅输出一行JSON:{"decision":"train|hold","epochs":0-5,"lr":0.002}\n'
+            + json.dumps(tiny, ensure_ascii=False, separators=(",", ":"))
+        )
     if compact:
         state = {key: value for key, value in payload.items() if key != "history_evidence"}
         state["rule_budget"] = {key: payload["rule_budget"][key]
@@ -243,11 +277,24 @@ def train(rnd) -> None:
     history["kill_switch"] = bool(previous_state.get("kill_switch"))
 
     # --- 4. rule budget, then let the model narrow it ---------------------
+    use_v17 = RELEASE in ULTRA_COMPACT_RELEASES
+    use_c_late = str(rnd.dataset_key) == "C" and RELEASE in C_LATE_BUDGET_RELEASES
+    idle_rounds = int(previous_state.get("idle_rounds", 0))
     budget = choose_budget(
         dataset_key=str(rnd.dataset_key), task=task, round_index=int(rnd.round_index),
         psi_prev=psi_prev, psi_holdout=max(psi_holdout, psi_baseline if not previous_state else 0.0),
         data_grew=data_grew, stage_changed=stage_changed, gap=metric_state["gap"],
-        history=history)
+        history=history,
+        recover_stalled_b=RELEASE in ("0.16", "0.17"),
+        quiet_stall_a=use_v17)
+    if use_c_late:
+        budget = plan_c_budget(
+            budget,
+            idle_rounds=idle_rounds,
+            kill_switch=bool(previous_state.get("kill_switch")),
+            idle_threshold=3,
+            min_calib_gain=0.005,
+        )
     model_state = {
         "round": rnd.round_index, "stage": stage_id, "dataset": rnd.dataset_key,
         "task": task, "metric": metric_state["metric"],
@@ -265,22 +312,34 @@ def train(rnd) -> None:
         "last_gain": history["last_gain"], "stalled": history["stalled"],
         "rule_budget": budget,
     }
-    compact_prompt = RELEASE == "0.15"
-    model_options = {"max_tokens": 256, "enable_thinking": False} if compact_prompt else {}
+    compact_prompt = RELEASE in COMPACT_MODEL_RELEASES
+    if use_v17:
+        model_options = {"max_tokens": 64, "enable_thinking": False}
+    elif compact_prompt:
+        model_options = {"max_tokens": 256, "enable_thinking": False}
+    else:
+        model_options = {}
     decision, model_text, model_diagnostics = decide_with_receipt(
-        rnd, _model_prompt(model_state, compact=compact_prompt), budget, history,
-        int(rnd.round_index), **model_options)
+        rnd, _model_prompt(model_state, compact=compact_prompt, ultra_compact=use_v17),
+        budget, history, int(rnd.round_index), **model_options)
     audit.write("model_receipt", step=int(rnd.round_index), **model_diagnostics)
     # The host may start with an older state. Recover its spent budget from the
     # platform's round records before assigning the next request.
     prior_spend = sum(int((r.get("configuration") or {}).get("epochs") or 0)
                       for r in (platform_history or []) if isinstance(r, dict))
     prior_spend = max(prior_spend, int(previous_state.get("requested_epochs_total", 0)))
-    task_limit = {"A": 28, "B": 25, "C": 13}.get(str(rnd.dataset_key))
-    if task_limit is not None and decision["epochs"] > max(0, task_limit - prior_spend):
-        remaining = max(0, task_limit - prior_spend)
-        decision.update(epochs=remaining, action="finetune" if remaining else "none",
-                        rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
+    if use_c_late:
+        decision = protect_c_attempt(decision, budget)
+        decision = pace_c_budget(
+            decision, spent=prior_spend, round_index=int(rnd.round_index),
+            limit=12, reserve_epochs=3, release_round=8,
+        )
+    else:
+        task_limit = {"A": 28, "B": 25, "C": 13}.get(str(rnd.dataset_key))
+        if task_limit is not None and decision["epochs"] > max(0, task_limit - prior_spend):
+            remaining = max(0, task_limit - prior_spend)
+            decision.update(epochs=remaining, action="finetune" if remaining else "none",
+                            rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
     log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
                   f"stage_changed={stage_changed} rule={budget['rule']} "
                   f"model={decision.get('model_action')} source={decision['source']} "
@@ -327,11 +386,15 @@ def train(rnd) -> None:
     outcome = None
     calibrate_c = (C_CALIBRATION_ENABLED and rnd.dataset_key == "C"
                    and task == "regression" and len(feature_paths) == 24)
+    calibrate_b = (RELEASE in B_CALIBRATION_RELEASES and rnd.dataset_key == "B"
+                   and task == "regression")
+    c_nasa_tol = 0.0015 if use_v17 else 0.0
     use_paired = RELEASE in PAIRED_RELEASES
     if int(decision["epochs"]) > 0:
         try:
             log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
-                          f"calibrate_c={calibrate_c} mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
+                          f"calibrate_c={calibrate_c} calibrate_b={calibrate_b} "
+                          f"mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
             round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
@@ -341,9 +404,13 @@ def train(rnd) -> None:
                 learning_rate=float(decision["lr"]),
                 patience=EARLY_STOP_PATIENCE,
                 calibrate_c=calibrate_c,
+                calibrate_b=calibrate_b,
+                fast_c_calibration=use_v17,
+                c_nasa_tol=c_nasa_tol,
                 calibration_mode=C_CALIBRATION_MODE,
                 selection_task=str(rnd.dataset_key) if use_paired else "",
                 smooth_weights=True,
+                train_groups=training_dataset.get("groups"),
                 validation_groups=validation_groups,
                 stage_id=stage_id or f"round-{rnd.round_index}",
                 hypothesis=decision["reason"],
@@ -351,7 +418,10 @@ def train(rnd) -> None:
                                            "signals": decision["signals"]},
                                           ensure_ascii=False))
             decide_promotion = paired_acceptance if use_paired else acceptance
-            outcome = decide_promotion(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key))
+            outcome = decide_promotion(
+                round_result.metrics_before, round_result.metrics_after,
+                task, str(rnd.dataset_key), c_nasa_tol=c_nasa_tol,
+            )
             gate.commit(gated.action, step=int(rnd.round_index))
             gate.note_step_ok()
             audit.write("round_result", step=int(rnd.round_index), rule=decision["rule"],
@@ -373,10 +443,12 @@ def train(rnd) -> None:
         code_snapshot_dir.mkdir(exist_ok=True)
         for source_file in (Path(__file__), PLATFORM_APP_DIR / "src/policy/strategy.py",
                             PLATFORM_APP_DIR / "src/harness/round_controller.py",
+                            PLATFORM_APP_DIR / "src/harness/late_budget.py",
                             PLATFORM_APP_DIR / "src/harness/model_receipt.py",
                             PLATFORM_APP_DIR / "src/models/official_round.py",
                             PLATFORM_APP_DIR / "vendor/contest_baselines/model.py",
                             PLATFORM_APP_DIR / "vendor/contest_baselines/data.py",
+                            PLATFORM_APP_DIR / "vendor/contest_baselines/b_calibration.py",
                             PLATFORM_APP_DIR / "vendor/contest_baselines/c_calibration.py"):
             if source_file.exists():
                 shutil.copyfile(source_file, code_snapshot_dir / source_file.name)
@@ -475,6 +547,7 @@ def train(rnd) -> None:
         "last": round(float(selected_value), 6),
         "last_gain": round(float(last_gain), 6),
         "stalled": int(stalled),
+        "idle_rounds": 0 if int(decision["epochs"]) > 0 else idle_rounds + 1,
         "last_rejected": bool(last_rejected),
         "updates": int(previous_state.get("updates", 0)) + (1 if int(decision["epochs"]) > 0 else 0),
         "promotions": int(promotions),
@@ -541,6 +614,8 @@ def train(rnd) -> None:
                        }} if use_paired and round_result is not None else {}),
                        "accepted": bool(outcome and outcome.get("accepted")),
                        "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
+                       "calibrate_b": bool(round_result and round_result.config.get("calibrate_b")),
+                       "execution": execution_record(decision, round_result, promoted, training_error),
                        "promoted": promoted, "gain": None if not outcome else outcome["gain"],
                        "gate": gated.approved},
         seed=int(parent_model.meta["seed"]),

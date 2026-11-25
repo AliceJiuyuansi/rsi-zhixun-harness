@@ -358,7 +358,9 @@ def summarise_history(records, state: dict, task: str) -> dict:
 # --------------------------------------------------------------- budget
 def choose_budget(*, dataset_key: str, task: str, round_index: int,
                   psi_prev: float, psi_holdout: float, data_grew: bool,
-                  stage_changed: bool, gap: float, history: dict) -> dict:
+                  stage_changed: bool, gap: float, history: dict,
+                  recover_stalled_b: bool = False,
+                  quiet_stall_a: bool = False) -> dict:
     """Return the rule-based budget plus the sentence that justifies it.
 
     Precedence (cheap first):
@@ -386,9 +388,14 @@ def choose_budget(*, dataset_key: str, task: str, round_index: int,
                 "signals": signals}
 
     if dataset_key == "A" and task == "classification":
-        return {"action": "finetune", "epochs": 3 if data_grew else 1,
-                "lr": RECOVER_LR if data_grew else CALIBRATION_LR[task],
-                "rule": "a_v1_fresh" if data_grew else "a_v1_quiet",
+        if quiet_stall_a and not data_grew and not stage_changed and stalled >= STALL_LIMIT:
+            return {"action": "none", "epochs": 0, "lr": 0.0, "rule": "a_stalled",
+                    "reason": f"A 组无新数据且已连续 {stalled} 轮无提升，跳过无效追训以节省算力",
+                    "signals": signals}
+        fresh = data_grew or stage_changed
+        return {"action": "finetune", "epochs": 3 if fresh else 1,
+                "lr": RECOVER_LR if fresh else CALIBRATION_LR[task],
+                "rule": "a_v1_fresh" if fresh else "a_v1_quiet",
                 "reason": "A follows the v1 budget: three epochs on new rows, one on a quiet round",
                 "signals": signals}
     if dataset_key == "C" and stage_changed:
@@ -399,6 +406,11 @@ def choose_budget(*, dataset_key: str, task: str, round_index: int,
                 "signals": signals}
 
     if stalled >= STALL_LIMIT and not stage_changed:
+        if (recover_stalled_b and dataset_key == "B" and task == "regression"
+                and psi >= PSI_MILD and _finite(gap) >= REG_MIN_GAIN):
+            return {"action": "finetune", "epochs": RECOVER_EPOCHS["B"], "lr": RECOVER_LR,
+                    "rule": "b_drift_recovery", "signals": signals,
+                    "reason": f"B 组停滞后出现输入漂移 PSI={psi:.3f} 和 RMSE 回落 {gap:.2%}，执行小预算探针"}
         if data_grew:
             return {"action": "finetune", "epochs": 1, "lr": CALIBRATION_LR.get(task, 1e-3),
                     "rule": "new_data_probe",
@@ -464,8 +476,8 @@ def apply_verdict(budget: dict, verdict: dict | None, history: dict,
                 "reason": "模型裁决回滚到父模型；本轮不训练"}
     if model_action == "hold":
         signals = budget.get("signals") or {}
-        drift_justifies_update = bool(signals.get("stage_changed")) and \
-            _finite(signals.get("psi_prev"), 0.0) >= PSI_MILD
+        drift_justifies_update = budget.get("rule") == "b_drift_recovery" or (
+            bool(signals.get("stage_changed")) and _finite(signals.get("psi_prev"), 0.0) >= PSI_MILD)
         if round_index <= 1 or drift_justifies_update:
             return {**budget, "model_action": "hold_ignored_drift",
                     "model_reason": verdict.get("reason", "")}
@@ -511,7 +523,8 @@ def _bearing_macro_gain(before: dict, after: dict) -> float | None:
     return sum(gains) / len(gains) if len(gains) >= 2 else None
 
 
-def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> dict:
+def acceptance(before: dict, after: dict, task: str, dataset_key: str = "",
+               *, c_nasa_tol: float = 0.0) -> dict:
     """Should the candidate replace the parent, and is the gain worth a upload?"""
     before_name, before_value, higher = metric_value(task, before)
     after_name, after_value, _ = metric_value(task, after)
@@ -538,7 +551,10 @@ def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> d
             delta = _finite(after.get("nasa_log1p"), math.nan) - _finite(before.get("nasa_log1p"), math.nan)
             if delta > 0.50:
                 accepted = False
-            nasa_bonus = gain >= 0.0 and delta <= -0.08
+            nasa_min_drop = -0.10 if c_nasa_tol > 0.0 else -0.08
+            nasa_bonus = gain >= -float(c_nasa_tol) and delta <= nasa_min_drop
+            if nasa_bonus and delta <= 0.50:
+                accepted = True
         promote = effective_gain >= REG_MIN_GAIN or nasa_bonus
     return {
         "metric": after_name or before_name,
@@ -550,9 +566,10 @@ def acceptance(before: dict, after: dict, task: str, dataset_key: str = "") -> d
     }
 
 
-def paired_acceptance(before: dict, after: dict, task: str, dataset_key: str) -> dict:
+def paired_acceptance(before: dict, after: dict, task: str, dataset_key: str,
+                      *, c_nasa_tol: float = 0.0) -> dict:
     """Candidate policy: compare only paired scores on the current holdout."""
-    result = acceptance(before, after, task, dataset_key)
+    result = acceptance(before, after, task, dataset_key, c_nasa_tol=c_nasa_tol)
     primary = "macro_f1" if dataset_key == "A" else "rmse"
     required = (primary, "nasa_log1p") if dataset_key == "C" else (primary,)
     if any(not math.isfinite(_finite(m.get(k), math.nan)) for m in (before, after) for k in required):

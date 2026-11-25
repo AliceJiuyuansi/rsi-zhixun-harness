@@ -55,7 +55,8 @@ class ComparePairedSelection(unittest.TestCase):
         for arm in (v8, paired):
             self.assertEqual(arm['budget']['executed_steps'], 1)
             self.assertGreater(arm['elapsed_seconds'], 0)
-            self.assertGreater(arm['cpu_seconds'], 0)
+            # A single NumPy step can finish inside one process-clock tick.
+            self.assertGreaterEqual(arm['cpu_seconds'], 0)
 
     def test_no_holdout_does_not_reuse_validation(self):
         report = self.run_pair()

@@ -95,12 +95,28 @@ class Model:
         hidden = np.tanh(x @ self.params["w1"] + self.params["b1"])
         return hidden, hidden @ self.params["w2"] + self.params["b2"]
 
-    def fit(self, x, y, epochs):
+    def fit(self, x, y, epochs, *, sample_weight=None, weight_decay=0.0, label_smoothing=0.0):
         if type(epochs) is not int or not 1 <= epochs <= 10000:
             raise ValueError("epochs must be between 1 and 10000")
         x = self.normalized(x)
         if y.shape != (len(x),) or not len(x):
             raise ValueError("target shape mismatch")
+        if not 0 <= weight_decay or not math.isfinite(weight_decay):
+            raise ValueError("weight decay must be finite and nonnegative")
+        if not 0 <= label_smoothing < 1 or (label_smoothing and self.meta["task"] != "classification"):
+            raise ValueError("label smoothing is only supported for classification in [0, 1)")
+        weight_sum = len(x)
+        if sample_weight is not None:
+            sample_weight = np.asarray(sample_weight, dtype=float)
+            if (sample_weight.shape != (len(x),) or not np.all(np.isfinite(sample_weight))
+                    or np.any(sample_weight <= 0)):
+                raise ValueError("sample weights must be finite, positive, and aligned with training rows")
+            if np.all(sample_weight == sample_weight[0]):
+                sample_weight = None
+            else:
+                weight_sum = float(sample_weight.sum())
+                if not math.isfinite(weight_sum):
+                    raise ValueError("sample weights have nonfinite total")
         if self.meta["task"] == "regression":
             target = (y - self.meta["target_mean"]) / self.meta["target_scale"]
         else:
@@ -116,22 +132,40 @@ class Model:
             for start in range(0, len(order), self.meta["batch_size"]):
                 indices = order[start:start + self.meta["batch_size"]]
                 batch, expected = x[indices], target[indices]
+                weights = sample_weight[indices] if sample_weight is not None else None
                 hidden, logits = self.forward(batch)
                 if self.meta["task"] == "classification":
                     logits -= logits.max(axis=1, keepdims=True)
                     probabilities = np.exp(logits)
                     probabilities /= probabilities.sum(axis=1, keepdims=True)
-                    loss_sum -= float(np.log(np.maximum(probabilities[np.arange(len(indices)), expected], 1e-300)).sum())
+                    rows = np.arange(len(indices))
+                    logp = np.log(np.maximum(probabilities[rows, expected], 1e-300))
+                    if label_smoothing:
+                        uniform_logp = np.log(np.maximum(probabilities, 1e-300)).mean(axis=1)
+                        logp = (1 - label_smoothing) * logp + label_smoothing * uniform_logp
+                    loss_sum -= float(logp.sum() if weights is None else weights @ logp)
                     delta = probabilities
-                    delta[np.arange(len(indices)), expected] -= 1
-                    delta /= len(indices)
+                    if label_smoothing:
+                        delta -= label_smoothing / probabilities.shape[1]
+                    delta[rows, expected] -= 1 - label_smoothing
+                    if weights is None:
+                        delta /= len(indices)
+                    else:
+                        delta *= (weights / weights.sum())[:, None]
                 else:
                     error = logits[:, 0] - expected
-                    loss_sum += float(np.sum(error ** 2))
-                    delta = (2 * error / len(indices))[:, None]
+                    if weights is None:
+                        loss_sum += float(np.sum(error ** 2))
+                        delta = (2 * error / len(indices))[:, None]
+                    else:
+                        loss_sum += float(weights @ (error ** 2))
+                        delta = (2 * error * (weights / weights.sum()))[:, None]
                 gradients = {"w2": hidden.T @ delta, "b2": delta.sum(axis=0)}
                 hidden_delta = (delta @ self.params["w2"].T) * (1 - hidden ** 2)
                 gradients.update(w1=batch.T @ hidden_delta, b1=hidden_delta.sum(axis=0))
+                if weight_decay:
+                    for name in ("w1", "w2"):
+                        gradients[name] += weight_decay * self.params[name]
                 norm = math.sqrt(sum(float(np.sum(g * g)) for g in gradients.values()))
                 if not math.isfinite(norm):
                     raise ValueError("nonfinite gradient")
@@ -146,7 +180,7 @@ class Model:
                 if not all(np.all(np.isfinite(p)) for p in self.params.values()):
                     raise ValueError("nonfinite model state")
             self.meta["epochs"] += 1
-            epoch_losses.append(loss_sum / len(x))
+            epoch_losses.append(loss_sum / weight_sum)
         self.validate()
         return epoch_losses
 
@@ -164,6 +198,12 @@ class Model:
             except Exception:  # noqa: BLE001 - serving must fall back to the base model
                 # A malformed/unseen calibration must never fail the whole
                 # prediction; the parent MLP output is a safe fallback.
+                pass
+        if "b_calibration" in self.meta:
+            try:
+                from .b_calibration import predict as b_predict
+                prediction = b_predict(x, prediction, self.meta["b_calibration"])
+            except Exception:  # noqa: BLE001 - serving must fall back to the base model
                 pass
         # v7.1 固定为非负、无上限；同一检查点不能随宿主环境改变预测。
         return prediction
