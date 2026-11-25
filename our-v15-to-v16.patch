@@ -1,0 +1,4371 @@
+--- a/.dockerignore
++++ b/.dockerignore
+@@ -21,10 +21,14 @@
+ *.key
+ 
+ # harness image
++!scripts/
++!scripts/check_release.py
++!release_manifest.json
+ !harness/
+ !harness/**
+ !vendor/
+ !vendor/**
++!_sdk/
+ !_sdk/contest-harness-sdk-1.0.4/
+ !_sdk/contest-harness-sdk-1.0.4/**
+ 
+--- a/README.md
++++ b/README.md
+@@ -1,166 +1,15 @@
+-﻿# 智训引擎 · 工业制造场景下的模型训练与超参数优化
+-
+-<!-- latest-trials -->
+-校赛及后续比赛均按 A、B、C 三题等权计分。现有六个已测版本中，首次正式评测推荐 **v5**（平台提交 `5a45bc60cf3f4ea34b35a3fa1f99bd4d`）。v6 用作逐题对照。 [正式评测操作步骤](reports/正式评测操作步骤.md) · [平台试运行复盘](reports/v4-v6试运行复盘.md)
+-<!-- /latest-trials -->
+-
+-[v8 源码与验证说明](reports/版本方案/v8.md)：模型回执恢复、C 风险校准、B/C 晋升门控和同轮权重平滑。v8 尚无平台成绩，不替代已测 v5 的推荐。
+-
+-> 第二届北京市大学生"人工智能+"创新大赛 · 赛题 9
+-> 工作区根目录：`D:\Alice_AI\rsi`
+-> 状态快照：2026-11-24（v1–v6 已完成平台试运行，三题等权首选 v5）
+-
+-本目录是**唯一的项目工作区**。所有规则解读、计划、实验约定、代码、配置都放在这里；
+-不在微信/飞书/个人电脑桌面另起一份。
+-
+----
+-
+-## 1. 这是什么比赛（一句话）
+-
+-在**漂移的工业数据流**上，做一个**能自己发现问题、自己决定要不要更新、自己验证、自己回滚**的系统，
+-并且用 SwanLab 把全过程记录下来。评委既看你"最后多准"，也看你"**每提升 1 个单位性能花了多少算力/标注/Token**"，
+-还要看这个系统在**断网、限资源、无人干预**的情况下能不能活下来。
+-
+-- 主办：北京市教育委员会；承办：北京工业大学
+-- 命题企业：软通计算机有限公司、华为技术有限公司
+-- 赛题全称："智训引擎"——工业制造场景下的模型训练与超参数优化
+-- 关键词：数据漂移（concept drift）、RSI（Recursive Self-Improvement）、Harness（LLM 驱动的工具/技能编排层）、受控自进化
+-
+----
+-
+-## 2. 五分钟上手（新队员 / 新 agent 从这里开始）
+-
+-1. 读 [`docs/00_赛题规则解读.md`](docs/00_赛题规则解读.md) —— 规则原文 + 逐条解读，**这是事实源**
+-2. 读 [`docs/01_赛程与关键节点.md`](docs/01_赛程与关键节点.md) —— 真实日期（**与 plan0 有重大出入**）
+-3. 读 [`plan1.md`](plan1.md) —— 当前执行计划（**以这份为准，plan0 仅作历史存档**）
+-4. 读 [`docs/03_SwanLab使用与团队协作.md`](docs/03_SwanLab使用与团队协作.md) —— 每个人必须配好
+-5. 读 [`docs/04_工程架构与规范.md`](docs/04_工程架构与规范.md) —— 目录、接口、命名、提交物
+-6. Agent（dsh 等）另读 [`AGENTS.md`](AGENTS.md) —— 交接说明、禁止事项、当前待办
+-
+----
+-
+-## 3. 文件地图
+-
+-| 路径 | 作用 | 谁维护 |
+-|---|---|---|
+-| `README.md` | 总入口 | 队长 |
+-| `AGENTS.md` | **给 AI agent 的交接协议**（dsh 必读） | 队长，变更需记录 |
+-| `plan0.md` | 最初的备赛清单（历史存档，**日期已过时**） | 不再修改 |
+-| `plan1.md` | 修正后的执行计划（当前有效） | 队长，每周更新 |
+-| `docs/00_赛题规则解读.md` | 规则逐条翻译成人话 + 设计含义 | 全员 |
+-| `docs/01_赛程与关键节点.md` | 官方赛程、校历、倒排 | 队长 |
+-| `docs/02_plan0评析与plan1改动说明.md` | 为什么改、改了什么 | 队长 |
+-| `docs/03_SwanLab使用与团队协作.md` | 安装、登录、团队空间、命名规范、合规 | 实验管理员 |
+-| `docs/04_工程架构与规范.md` | 系统架构、接口契约、目录、成本口径 | 技术负责人 |
+-| `docs/open_questions.md` | 待组委会/群内确认的问题台账 | 全员补充 |
+-| `docs/05_真实数据实验报告.md` | XJTU-SY 代理数据结果、结论、局限 | 技术负责人 |
+-| `docs/06_赛题任务与实现思路.md` | **新手向**：任务梳理、微调、RSI、知识点、5 天排期 | 全员必读 |
+-| `docs/08_三任务落地路径.md` | **官方三个任务（气体/轴承/发动机）怎么落地**、看不懂数据时的侦察法、指标与阈值改造清单 | 技术负责人 |
+-| `docs/07_操作手册.md` | **保姆级操作**：harness 要不要训练、数据处理五步、怎么测、怎么看结果、动作白名单 | 全员必读 |
+-| `docs/交接_2026-11-20.md` | **一页交接单**：现状、数字、环境、待办、约束（给 dsh / 新队员） | 队长 |
+-| `docs/交接_2026-11-24.md` | **最新一页交接单**：v4/v5 建版、C 校准、试运行顺序 | 队长 |
+-| `docs/交接_2026-11-23.md` | 上一版交接单：v1/v2 试运行、v3 上限证伪 | 队长 |
+-| `docs/status.md` | 每周进度快照（agent 交接也看这个） | 队长 |
+-| `src/` | 代码（含受控五件套：`policy/whitelist|bounds|budget.py`、`harness/killswitch|guard.py`、`utils/audit.py`） | — |
+-| `configs/` | YAML 配置（实验参数全在这，不写死在代码里） | — |
+-| `Dockerfile` / `requirements.txt` / `.dockerignore` | 离线镜像构建三件套 | — |
+-| `scripts/` | 一键脚本（smoke / stream / matrix / check_guard / entrypoint） | — |
+-| `data/` | 数据目录（当前为 XJTU-SY 代理数据），见 `data/README.md` / `data/VERSION.md` | — |
+-| `experiments/` | 本地实验产物（模型、指标、成本账本） | — |
+-| `reports/` | 答辩材料、图表、成本收益曲线 | — |
+-| `赛题规则.pdf` | 官方原文件，**最高事实源** | 只读 |
+-
+----
+-
+-## 4. 三条硬门槛（不过线 = 不参与排名）
+-
+-1. 封闭评测中**无人工干预**跑完全部阶段，并按时输出结果
+-2. 全部训练/微调/调整/评估实验按《实验记录规范》在 SwanLab 留下**完整记录**
+-3. 封闭评测**综合性能不低于组委会静态基线**（部署后不再更新的模型）
+-
+-> 注意：门槛 3 意味着"花里胡哨但比基线差"= 直接出局。**先保底，再冲刺。**
+-
+----
+-
+-## 5. 当前最紧急的三件事
+-
+-| # | 事项 | 截止 | 负责人 |
+-|---|---|---|---|
+-| 1 | **确认队伍是否已完成官网初始报名**（官方通知写 11-07/11-09 截止，今天 11-11） | 今天 | 队长 |
+-| 2 | 进赛题答疑群，把 `docs/open_questions.md` 里的问题发出去 | 今天 | 队长 |
+-| 3 | 5 人各自注册 SwanLab 并加入团队空间 `@xiangxinnidexin` | 11-12 | 全员 |
+-
+----
+-
+-## 6. 团队与账号
+-
+-- SwanLab 团队空间：<https://swanlab.cn/@xiangxinnidexin>（团队名"相信你的心"，机构：中国人民大学）
+-- 规则明确：**账号不得泄露或转借**。所以每个人用自己的账号，加入同一个团队空间，而不是共用一个账号。
+-- 比赛的提交物里包含"云端实验记录链接/查询依据"，团队空间必须能让评委看到。
+-
+----
+-
+-## 7. 现在能跑什么（2026-11-11 起）
+-
+-代码已从"零"变成**可运行的系统骨架**，数据用公开的 XJTU-SY 轴承全寿命集（**非官方包**，
+-见 [`data/VERSION.md`](data/VERSION.md)）。
+-
+-```bash
+-cd D:/Alice_AI/rsi
+-export PYTHONIOENCODING=utf-8      # Git Bash 下中文日志不乱码
+-
+-# 1) 快速自检（几秒，不碰真实数据）
+-python scripts/smoke.py
+-
+-# 2) 从原始振动 CSV 抽特征缓存（已有缓存则跳过；全量约 2 分钟 / 8 进程）
+-python scripts/build_xjtu_cache.py
+-#    -> data/processed/xjtu/*.npz + manifest.json（9,216 个快照）
+-
+-# 3) 单条真实流：静态 / 周期 / 触发
+-python scripts/run_stream.py --stream xjtu_3_4 --policy trigger --seed 0
+-
+-# 4) 策略矩阵（4 个轴承 × 3 策略 × 2 seed）
+-python scripts/run_matrix.py --streams xjtu_3_1,xjtu_3_2,xjtu_3_4,xjtu_2_3 \
+-    --policies static,periodic,trigger --seeds 0,1
+-#    -> experiments/matrix-<ts>/matrix.{csv,md,json}
+-
+-# 5) 看不懂结果时：从头看一遍数据流水线 + 人话版成绩单
+-python scripts/inspect_data.py
+-python scripts/report_run.py
+-
+-# 6) 受控 RSI 五件套：9 类故障注入（非法动作/坏 JSON/超预算/超幅度/kill-switch/断流/…）
+-python scripts/check_guard.py
+-
+-# 7) 离线镜像：构建 + 断网跑（评测机形态）
+-docker build -t zhixun-rsi:0.1 .
+-docker run --rm --network none zhixun-rsi:0.1
+-
+-# 8) v2 平台入口彩排（假宿主，不消耗平台次数）
+-python scripts/test_harness_local.py --dataset A --rounds 10 --grow
+-python scripts/test_harness_local.py --dataset C --rounds 2 --grow --max-train-rows 8000 --docker --image zhixun-rsi-harness:0.5
+-python scripts/replay_trial.py            # v1 报告 -> v2 预算回放
+-```
+-
+-合成漂移流（`stable/gradual/sudden/recurring/concept/lshift`）仍然保留，
+-用于可控地压测单条机制；真实数据用于验证"自然退化"下的系统行为。
+-
+-**已有结果**：静态模型 MAE 0.34–0.45，周期重训 0.11–0.20，触发式 0.09–0.12；
+-按单位增益成本算周期重训更划算。完整数据、结论与局限见
+-[`docs/05_真实数据实验报告.md`](docs/05_真实数据实验报告.md)
+-（MAE 可复现；成本是 wall-clock 计时，负载会让它差 ±15%，最终数字需空载复测）。
+-
+-**交付链现状**：受控五件套 5/5（`scripts/check_guard.py` 全 PASS）；
+-离线镜像 `zhixun-rsi:0.1` 已构建，`docker run --network none` 断网跑通、exit 0。
+-**v4/v5 候选镜像** `zhixun-rsi-harness:0.4/0.5` 已构建（285 MB，tar 64 MB），
+-`docker run --rm --network none zhixun-rsi-harness:0.5 describe` 通过；
+-v1 平台试运行报告见 `docs/status.md` / `reports/技术报告_v2.md`。
+-
+-> SwanLab 当前默认 `auto`：没登录时写本地 `swanlog/`（不阻塞），登录后自动上传团队空间。
+-
+----
+-
+-## 8. 事实源优先级
+-
+-`赛题规则.pdf`（官方原文） > 组委会/企业答疑群答复 > 学校教务处通知 > `docs/00` > `plan1.md` > 其它
+-
+-冲突时永远以更靠前的为准，并在 `docs/open_questions.md` 记录冲突。
++# 智训引擎 v16 源码候选
++
++v16 修复两份 v15 的模块与发布一致性。训练/预测策略沿用已验证的我方 v15；不包含新平台成绩、镜像 tar、数据、权重、SDK 或密钥。
++
++- 比较依据与结果：`reports/v16_比较与交付.md`
++- 平台入口：`harness/contest_submission.py`
++- 发布预检：`scripts/check_release.py`；文件清单：`release_manifest.json`
++- 安全导出：`scripts/build_source_bundle.py`（ZIP 解压后预检及完整单测）
++- 92 项测试；SwanLab 历史记录不冒记为新版本实验。
++
++先运行 `py -3.12 scripts/check_release.py --root .`，再运行 `py -3.12 -m unittest discover -s tests -v`。
++预检通过但提示缺 SDK 时，只代表源码检查通过；完整协议仍需官方 SDK。
++
++默认版本 0.16，C 为 res_mlp_v2；镜像构建仍需 `_sdk/contest-harness-sdk-1.0.4`。
++Dockerfile 构建后会执行预检；实际镜像/断网协议未在当前机器完成验收。
+--- /dev/null
++++ b/SOURCE_README.md
+@@ -0,0 +1,17 @@
++# 智训引擎 v16 源码候选
++
++v16 修复两份 v15 的模块与发布一致性。训练/预测策略沿用已验证的我方 v15；不包含新平台成绩、镜像 tar、数据、权重、SDK 或密钥。
++
++- 比较依据与结果：`reports/v16_比较与交付.md`
++- 平台入口：`harness/contest_submission.py`
++- 发布预检：`scripts/check_release.py`；文件清单：`release_manifest.json`
++- 安全导出：`scripts/build_source_bundle.py`（ZIP 解压后预检及完整单测）
++- 92 项测试；SwanLab 历史记录不冒记为新版本实验。
++
++先运行 `py -3.12 scripts/check_release.py --root .`，再运行 `py -3.12 -m unittest discover -s tests -v`。
++预检通过但提示缺 SDK 时，只代表源码检查通过；完整协议仍需官方 SDK。
++
++默认版本 0.16，C 为 res_mlp_v2；镜像构建仍需 `_sdk/contest-harness-sdk-1.0.4`。
++Dockerfile 构建后会执行预检；实际镜像/断网协议未在当前机器完成验收。
++
++训练代码仅依赖标准库和 NumPy；官方 SDK 由平台另行提供，其依赖以 SDK 清单为准。requirements.txt 还列有历史研究脚本依赖，不表示镜像安装了这些组件。源码整理参考队友的说明结构，算法仍来自完整我方 v15。
+--- /dev/null
++++ b/THIRD_PARTY_LICENSES.md
+@@ -0,0 +1,7 @@
++# 第三方组件说明
++
++本项目训练与预测代码使用 Python 标准库和 NumPy；容器另需平台提供的官方 SDK。Python/NumPy 的许可文本由相应发行包提供，本文件是归属清单，不替代原始许可证。
++
++requirements.txt 中另有历史研究脚本使用的 scikit-learn、SciPy、PyYAML；平台镜像的实际安装以 harness.Dockerfile 和 SDK 声明为准。SwanLab 仅用于此前开发实验的实时离线记录，本版没有新增训练实验或补录记录。
++
++vendor/contest_baselines 为赛事公开基线副本及本项目改动，使用和分发范围应遵循赛事数据包及仓库中的原始说明；本文件不额外授予其权利。SDK、官方数据、检查点和密钥不随本源码包分发。
+--- a/docs/04_工程架构与规范.md
++++ b/docs/04_工程架构与规范.md
+@@ -1,420 +1,422 @@
+-# 04 · 工程架构与规范
+-
+-> **v7.1 契约（2026-11-24）**：镜像与源码默认采用v7；Model.predict固定为非负、无B/C上限，不再读取发布环境。C校准参数继续随检查点保存，显式RSI_C_CALIBRATION=0可关闭新拟合。schema3增加rows/rows_history、模型回执诊断和最终验证指标。NASA与B逐轴承指标仅观测，不改变晋升门槛。final_epochs/final_steps对应实际保存的最佳快照；executed_final_*另记执行消耗。44项单测及三题公开三轮对照通过；本机缺SDK与Docker daemon，未做平台协议/镜像验收。见 `reports/v7.1_交付_2026-11-24.md`。
+-
+-> 本文定义"系统长什么样、代码怎么组织、接口怎么对齐"。
+-> Phase 1 开始前必须全队过一遍；之后每次改接口都要改本文。
+-
+----
+-
+-## 一、系统全景
+-
+-```
+-                    ┌──────────────────────────────────────────────┐
+-                    │              Harness（策略层）                 │
+-                    │  观察 → 诊断 → 提案 → 门控 → 执行 → 记账        │
+-                    │        ↑                    ↓                │
+-                    │   DecisionPolicy: rule / local_llm / pytrio   │
+-                    └───────┬──────────────┬───────────────┬───────┘
+-                            │              │               │
+-        ┌───────────────────▼──┐   ┌───────▼────────┐  ┌───▼─────────┐
+-        │   Monitor 漂移监测     │   │  Trainer 训练   │  │ Evaluator   │
+-        │  特征分布 + 残差双通道  │   │ 重训/微调/换模型 │  │ 流式评估     │
+-        └───────────┬──────────┘   └───────┬────────┘  └───┬─────────┘
+-                    │                      │               │
+-        ┌───────────▼──────────────────────▼───────────────▼─────────┐
+-        │                 DataStream（时间切片，模拟隐藏流）             │
+-        └───────────────────────────┬─────────────────────────────────┘
+-                                    │
+-        ┌───────────────────────────▼─────────────────────────────────┐
+-        │  Registry 版本仓（model_id / config_hash / 指标快照 / 回滚）    │
+-        └───────────────────────────┬─────────────────────────────────┘
+-                                    │
+-        ┌───────────────────────────▼─────────────────────────────────┐
+-        │  CostLedger 成本账本 ＋ AuditLog 审计日志 ＋ SwanLab 上报       │
+-        └─────────────────────────────────────────────────────────────┘
+-```
+-
+-### 闭环状态机
+-
+-```
+-IDLE ──tick──▶ MONITOR ──no drift──▶ IDLE
+-                 │
+-              drift?
+-                 ▼
+-             DIAGNOSE ──covariate shift──▶ ACTION(reweight/feature)
+-                 │                              │
+-           concept drift                        │
+-                 ▼                              │
+-             PROPOSE ◀──────────────────────────┘
+-                 │
+-             GATE（收益/成本比、预算、次数、白名单）
+-                 │ pass                    │ reject
+-                 ▼                         ▼
+-             TRAIN/TUNE ──▶ EVALUATE ──▶ PROMOTE ──▶ IDLE
+-                              │ fail
+-                              ▼
+-                           ROLLBACK ──▶ IDLE
+-```
+-
+-> 任何一步异常 → 直接 `IDLE`（保持当前模型），**不允许崩溃**。
+-
+----
+-
+-## 二、目录结构
+-
+-```
+-rsi/
+-├── README.md
+-├── AGENTS.md
+-├── plan0.md / plan1.md
+-├── docs/
+-├── src/
+-│   ├── data/            # 数据加载、时间切片、schema
+-│   ├── features/        # 特征工程（复用预提取特征）
+-│   ├── models/          # 模型定义、训练、保存
+-│   ├── monitor/         # 漂移监测 + 归因
+-│   ├── policy/          # 决策策略（rule / llm）
+-│   ├── harness/         # 闭环编排、门控、状态机
+-│   ├── eval/            # 流式评测、指标、成本
+-│   ├── registry/        # 版本仓、回滚
+-│   └── utils/           # 日志、配置、swanlab wrapper
+-├── configs/
+-│   ├── base.yaml
+-│   ├── streams/         # 每条流的定义
+-│   └── exp/             # 每个实验的配置
+-├── scripts/
+-│   ├── smoke.py         # 冒烟：1 batch → 1 run
+-│   ├── run_stream.py    # 跑一条流
+-│   ├── run_matrix.py    # 跑对照矩阵
+-│   └── docker_entry.sh  # 镜像入口
+-├── data/                # 官方数据（不进 git）
+-├── experiments/         # 产物（不进 git）
+-└── reports/             # 答辩材料
+-```
+-
+-**规则**：
+-
+-- 参数只写 `configs/*.yaml`，代码里不出现魔法数字
+-- `scripts/` 只做编排，业务逻辑在 `src/`
+-- 任何脚本跑完必须自动产生 SwanLab run，不依赖手动
+-
+----
+-
+-## 三、接口契约（先定接口，再各写各的）
+-
+-> 用 dataclass 定义，Phase 1 第一天落成 `src/schema.py`。
+-> 字段可以加，**不能改语义**；改语义必须全队同步并更新本文。
+-
+-```python
+-@dataclass
+-class StreamSlice:
+-    t: int                  # 时间片编号
+-    X: np.ndarray           # 预提取特征（或原始）
+-    y: Optional[np.ndarray] # 标签（可能延迟到达/部分缺失）
+-    meta: dict              # 工况、设备号、班次等
+-
+-@dataclass
+-class Metrics:
+-    perf: float             # 主指标（acc/f1/mae，视任务）
+-    perf_delta: float       # 相对静态基线
+-    latency_p95: float
+-    n_samples: int
+-
+-@dataclass
+-class DriftSignal:
+-    t: int
+-    feature_score: float    # 0~1
+-    residual_score: float   # 0~1
+-    is_drift: bool
+-    evidence: dict          # 每个特征的 PSI/KS、残差曲线摘要
+-
+-@dataclass
+-class Diagnosis:
+-    kind: Literal["covariate", "concept", "none"]
+-    confidence: float
+-    reason: str             # 给审计日志和答辩用
+-    suggested: list[str]    # ["reweight", "retrain", "none"]
+-
+-@dataclass
+-class Action:
+-    kind: Literal["none", "retrain", "finetune", "swap_model", "reweight"]
+-    params: dict            # 受白名单约束
+-    est_cost: float
+-    est_gain: float
+-
+-@dataclass
+-class GateDecision:
+-    approved: bool
+-    reason: str             # "gain/cost=2.1 >= 1.5" / "budget exhausted" / "whitelist reject"
+-    action: Action
+-
+-@dataclass
+-class CostRecord:
+-    gpu_seconds: float
+-    labels: int
+-    tokens: int
+-    wall_seconds: float
+-```
+-
+-### 成本口径
+-
+-```python
+-def unit_gain_cost(cost, delta_perf, alpha=1, beta=1, gamma=1, eps=1e-6):
+-    total = alpha*cost.gpu_seconds + beta*cost.labels + gamma*cost.tokens
+-    return total / max(delta_perf, eps)
+-```
+-
+-- α/β/γ 未知时全取 1，**只比较组间相对值**
+-- 标注成本按"条"计，Token 按"千 token"还是"token"待 Q5 确认，**先按原始数记，换算在报表层做**
+-
+----
+-
+-## 四、受控 RSI 五件套（架构级，不是可选功能）
+-
+-| 机制 | 实现位置 | 具体做法 | 验收 |
+-|---|---|---|---|
+-| 白名单 | `src/policy/whitelist.py` | 动作枚举 `ALLOWED_ACTIONS` + 每个动作的参数名/取值范围 `PARAM_SPEC`；对外部提案（LLM JSON）用 `parse_proposal()`，**永不抛异常**，坏输入一律降级 `none` | `check_guard.py` F1/F2 |
+-| 幅度上限 | `src/policy/bounds.py` | 单次变更 ≤ 上版的 `amplitude_factor`（默认 2×），且同一动作最多改 2 个参数；超限截断并记 `bounds_clip` | F4 |
+-| 次数上限 | `src/policy/budget.py` | 终身 `max_retrains: 12` + 窗口内 `max_retrains_per_window: 8 / 40 步`（0 = 不限）；超限只能 `none` | F3 |
+-| kill-switch | `src/harness/killswitch.py` | `RSI_STOP=1` / `RSI_KILL_SWITCH=1` / `policy.kill_switch: true` / `STOP` 文件 / `max_wall_seconds` 超时 / 连续 `max_consecutive_failures` 次异常；**触发即锁死、不再恢复** | F5/F7 |
+-| 审计日志 | `src/utils/audit.py` | 每个 run 一个 `audit.jsonl`，append-only、逐行 flush：`run_start` / `action`（提案 + 门控理由 + 前后指标 + 成本）/ `reject_whitelist` / `reject_budget` / `bounds_clip` / `rollback` / `degraded` / `kill_switch` / `run_end` | F6 |
+-
+-**唯一闸口**：`src/harness/guard.py` 的 `Gatekeeper.review()`。策略或外部 LLM 只能"提案"，
+-放行顺序固定：
+-
+-```
+-提案 → kill-switch（锁死则 none）
+-     → 白名单（枚举 / 参数名 / 参数范围 / 单次最多 2 个参数）
+-     → 预算（终身次数 + 窗口速率）
+-     → 幅度上限（≤ 上版 2×，超限截断）
+-     → approved
+-```
+-
+-失败一律降级为 `none`（保持当前冠军），执行后由 `guard.commit()` 记账。审计与门控状态落在
+-`<run>/audit.jsonl` 与 `<run>/guard.json`，`summary.json` 里同时留 `guard`/`audit` 摘要。
+-
+-**验收方式**：故意喂非法动作、超预算、超次数、坏 JSON、断数据，系统都必须**降级而非崩溃**。
+-`python scripts/check_guard.py` 覆盖 9 类故障（F1 白名单 / F2 坏 JSON / F3 次数 / F4 幅度 /
+-F5 kill-switch 四来源 / F6 断流 / F7 连续异常自动锁死 / F8 数据缺失 / 健康跑到尾），
+-退出码 0 = 全部降级成功。
+-
+----
+-
+-## 四点五、平台 Harness 契约（2026-11-20 新增，SDK 1.0.4）
+-
+-平台只按三种方式调用镜像：`python3 /app/harness.py describe|train|predict`。
+-一次 `train` = 一个 **round**（检查点序号从 1 开始）；每数据集 10 轮。
+-
+-```
+-/app          只读  我们的代码 + SDK + harness.py
+-/data         只读  train.jsonl / validation.jsonl（当前阶段公开投影）
+-/previous     只读  父产物（checkpoint.npz + 代码），摘要平台核验
+-/state        只读  上一轮原生状态
+-/workspace    可写  候选、状态副本
+-```
+-
+-一轮里必须做的五件事（缺一即失败）：
+-
+-1. 只从 `/data` 读训练/验证数据；
+-2. 从 `/previous/checkpoint.npz` **续训**（权重 + Adam + 标准化参数），不许从零训；
+-3. **至少一次真实模型调用** `rnd.model(...)`，`model_call_ids` 不能为空；
+-4. `rnd.submit_candidate(...)` 交一个 `/workspace` 下的新目录（含 `checkpoint.npz` + `training.json` + `history.jsonl`）；
+-5. `rnd.finish(selected_artifact_id=...)`——可选新候选、父模型或更早产物。
+-
+-实现位置与契约：
+-
+-| 文件 | 角色 |
+-|---|---|
+-| `harness/harness.py` | 官方入口模板，只做命令分发 |
+-| `harness/contest_submission.py` | `train(rnd)` / `predict(sample, model_dir)`，失败一律降级"保持父模型"并照常 finish |
+-| `src/models/official_round.py` | 续训原语 `continue_round(...)`，**早停 + 保留最佳快照** |
+-| `src/policy/strategy.py` | 漂移带 → 动作（none / finetune N 轮 / reweight） |
+-| `vendor/contest_baselines/` | 官方训练包副本（镜像自带，不依赖 `data/`） |
+-
+-`continue_round` 的 `patience>0` 表示：连续 N 个 epoch 没有刷新最佳验证分就停，并保存**最佳那轮**的权重（不是最后一轮）。实测：固定 8 epoch 会把验证分刷到 0.7264 但伪隐藏 batch6 掉到 0.324；
+-
+-早停 3 epoch 得 0.7257、耗时 0.02s vs 0.08s——**省钱且防过拟合，但不等于提分**。
+-
+-本地彩排（不消耗平台试运行次数）：
+-
+-```bash
+-python scripts/test_harness_local.py --dataset A --rounds 10 --grow        # 进程内假宿主
+-python scripts/test_harness_local.py --dataset A --rounds 3 --docker       # 容器内、--network none
+-python scripts/test_harness_local.py --dataset C --rounds 3 --max-train-rows 20000
+-```
+-
+-### 4.6 v2 轮次控制器（2026-11-23 新增）
+-
+-v1 试运行暴露了四个问题（回归初值、模型回复取不到、无收益仍重训、漂移参考不跨轮），
+-v2 把它们收敛到 `src/harness/round_controller.py`，`contest_submission.py` 只做 I/O 与闸门。
+-
+-**状态 schema 2**（`/workspace/state-round-N/harness_state.json`）：
+-
+-```text
+-metric / direction / baseline / best / last / last_gain / stalled / last_rejected
+-n_train / n_validation / stage_id
+-profile / baseline_profile / pred_profile      # 分位数直方图 + 预测直方图
+-updates / promotions / bounds / budget_steps / audit_events
+-decisions[≤10]                                 # 每轮的规则、PSI、模型裁决、前后指标
+-```
+-
+-**预算表**（`choose_budget`，廉价优先）：
+-
+-| 条件 | 预算 |
+-|---|---|
+-| 首轮 | A 5 / B 5 / C 3 epoch，lr 2e-3 |
+-| 新阶段 + PSI(上轮) ≥ 0.25 | A 3 / B 3 / C 2 |
+-| 新阶段 + 输入移动小 | 分类 2 / 回归 4（受上限约束） |
+-| 无新数据、指标回落 | A 3 / B 2 / C 2 |
+-| 上轮正收益、无停滞 | 分类 1 / 回归 3（校准） |
+-| 连续 ≥ 2 轮无收益 | 0（停手） |
+-| 停手后数据又增长 | 1（探针） |
+-
+-**模型裁决**：`extract_text` 依次读 `content` → `reasoning_content` → 数组内容 → `output_text`；
+-要求一行 JSON，解析失败记 `model_action=unavailable`。模型只能 `hold` / 收窄 `train` / `rollback`，
+-不能放大预算；首轮与“新阶段+强漂移”不允许被 `hold` 掉。
+-
+-**验收阈值**：分类 `gain ≥ -0.001` 可接受、`≥ +0.002` 才提交；回归相对 RMSE
+-`gain ≥ -0.2%` 可接受、`≥ +0.2%` 才提交。被拒候选不上传。
+-
+-**回放**：`python scripts/replay_trial.py` 把 v1 报告逐轮喂给 `choose_budget`，
+-输出 `reports/v2_replay_v1.{md,json}`（反事实，不重新训练）。
+-
+----
+-
+-### 4.7 v4/v5 候选（2026-11-24 新增）
+-
+-**v4（默认）**：撤销 C 的 145 上限；`clip_regression_prediction` 只保留非负约束。
+-同时启用三项工程修复：
+-
+-- `vendor/contest_baselines/data.py` 特征路径缓存（`lru_cache(2048)` + tuple path）；
+-- `summarise_history` 用每轮 `configuration.gain`，不做跨阶段分数差分；
+-- `contest_submission` 恢复 `kill_state`，训练成功/失败更新连续失败计数。
+-
+-**v5（C 校准，可选）**：镜像构建参数 `RSI_C_CALIBRATION=1` 打开；默认 0。
+-仅对 24 特征 C 回归生效：
+-
+-- 只用公开训练集，按第一项运行设置分工况估计传感器均值/方差；
+-- 5 节点分段线性残差，每样本最多修正 ±10；未见工况沿用父预测；
+-- 参数存于 `Model.meta["c_calibration"]`，随检查点保存；推理只依赖 NumPy；
+-- 校准拟合失败时回退到未校准模型，不中断训练。
+-
+-**构建**：
+-
+-```bash
+-docker build --build-arg RSI_C_CALIBRATION=0 -f harness.Dockerfile -t zhixun-rsi-harness:0.4 .
+-docker build --build-arg RSI_C_CALIBRATION=1 -f harness.Dockerfile -t zhixun-rsi-harness:0.5 .
+-```
+-
+-**验收**：30 项单测；`check_guard.py` 9/9；两镜像断网 `describe`；
+-`0.5` 的 C 2 轮容器彩排 `calibrate_c=True`；v4/v5 的 C 全量 3 轮 + 23,049 条
+-逐条预测与公开结果一致。
+-
+----
+-
+-### 4.8 v8 控制器
+-
+-SDK 1.0.4 的 `describe/train/predict` 和 NPZ 文件格式不变。C 校准在原有 `meta.c_calibration` 内新增可选 `shifts` 字典，旧检查点未设置时按零偏移读取。内部 `continue_round(..., smooth_weights=False)` 向后兼容；v8 入口显式开启，`training.json` 的 `weight_smoothing` 记录是否采用插值。训练报告中的 epoch/step 仍区分实际执行数与所选快照数。
+-
+-## 五、实验规范（对应《实验记录规范》，全文待 Q2 确认）
+-
+-### 5.1 一个实验 = 一次 run
+-
+-- 一次 run 只改**一个变量**（对照组原则）
+-- 同组实验用相同 `group`，不同种子用 `s1/s2/s3`
+-- 跑之前先写 `configs/exp/xxx.yaml`，**不允许**命令行临时改参数后不记录
+-
+-### 5.2 必记字段
+-
+-见 `03_SwanLab使用与团队协作.md` 第七节。最低要求：`data_version`、`method`、`seed`、`stream`、`model`、`decision_policy`。
+-
+-### 5.3 禁止
+-
+-- 本地跑完再手动补录（容易漏、容易编）
+-- 用不同数据版本的结果放在同一张对比表里
+-- 只保留最好的一次，删掉失败的 run（失败也是证据）
+-
+----
+-
+-## 六、提交物规范
+-
+-### 6.1 系统镜像
+-
+-- 入口：`docker run <image>` 直接跑完一条流，**不需要传一堆参数**
+-- 自包含：权重、依赖、特征提取器、兜底模型全在镜像里
+-- 离线：无任何出网调用（可用 `strace` / 断网机器验证）
+-- 资源：CPU/内存/超时按未知规范取保守值，预留 30% 余量
+-- 日志：标准输出 + 落盘 `run.log`，方便评审排查
+-- 退出码：成功 0；失败也要输出"保持当前模型"的结果，**不要非 0 退出**
+-
+-### 6.2 系统运行说明文档（`reports/系统说明.md`）
+-
+-1. 系统做什么（一段话）
+-2. 架构图 + 数据流
+-3. 如何运行（一条命令）
+-4. 资源需求与耗时
+-5. 决策逻辑与受控机制
+-6. 实验记录在哪看（SwanLab 链接 + 项目结构说明）
+-7. 已知限制
+-
+-### 6.3 实验记录
+-
+-- 链接：团队项目 URL
+-- 查询依据：项目名、关键 run 名清单、对照矩阵表
+-- **提交前用无痕窗口验证链接公开可访问**
+-
+----
+-
+-## 七、代码规范（轻量，够用即可）
+-
+-- Python 3.10+，`from __future__ import annotations` 可选
+-- 全部随机源固定种子（`random` / `numpy` / `torch`）
+-- 配置用 YAML + dataclass 校验，禁止 `**kwargs` 满天飞
+-- 日志用 `logging`，不要 `print`（镜像里 print 会被吞）
+-- 类型注解覆盖公共接口
+-- 每个模块一个 `README` 或在文件头写 3 行说明
+-- 提交信息：`[阶段] 动词 + 对象`，例：`[p1] add stream evaluator`
+-
+-### 开发环境一致性
+-
+-- `requirements.txt` 锁版本（`pip freeze`）
+-- 可选：`Dockerfile.dev` 供开发用，避免"我这儿能跑"
+-- Windows 开发 + Linux 评测：路径一律 `pathlib`，不要写死 `\`
+-
+----
+-
+-## 八、测试与验收
+-
+-| 层级 | 内容 | 何时 |
+-|---|---|---|
+-| 冒烟 | `scripts/smoke.py` 跑通 | 每天 |
+-| 流测试 | 4 条合成流各跑一遍 | 每次改策略 |
+-| 故障注入 | 5 类故障 fallback | 11-24 前 |
+-| 离线 dry-run | 断网 + 限资源 + 隐藏流 | 11-25 与 12-02 |
+-| 复现测试 | 换机器跑基线，结果一致 | Phase 1 出口 |
+-
+-**验收原则**：判据写成"命令 + 期望输出"，不写"完成"。
+-
+-例：
+-
+-```bash
+-python scripts/run_stream.py --config configs/streams/gradual.yaml
+-# 期望：退出码 0；experiments/<run_id>/metrics.json 存在；
+-#       cost.json 中 unit_gain_cost > 0；SwanLab 出现 1 条 run
+-```
+-
+----
+-
+-## 九、待确认的工程问题
+-
+-| # | 问题 | 影响 |
+-|---|---|---|
+-| E1 | 镜像的基础镜像/入口/资源上限 | Dockerfile 怎么写 |
+-| E2 | 评测总超时 | 策略能跑几轮 |
+-| E3 | 是否断网、断网程度 | 能否用本地 LLM |
+-| E4 | 评测机是否预置 Qwen3.8-27B | 镜像体积 |
+-| E5 | 标注配额怎么算（请求即计 / 使用才计） | 主动学习是否可行 |
+-| E6 | Token 计量口径（输入/输出/缓存是否分别计） | 成本优化方向 |
+-
+-→ 全部登记在 `docs/open_questions.md`。
++> v16 发布契约：运行模块必须与 release_manifest.json 一致；ZIP 导出后新进程导入及完整单测通过才交付。镜像 COPY 后执行预检并要求 SDK CLI 可导入；此项不替代完整协议验收。算法和线上容错沿用完整 v15。
++
++# 04 · 工程架构与规范
++
++> **v7.1 契约（2026-11-24）**：镜像与源码默认采用v7；Model.predict固定为非负、无B/C上限，不再读取发布环境。C校准参数继续随检查点保存，显式RSI_C_CALIBRATION=0可关闭新拟合。schema3增加rows/rows_history、模型回执诊断和最终验证指标。NASA与B逐轴承指标仅观测，不改变晋升门槛。final_epochs/final_steps对应实际保存的最佳快照；executed_final_*另记执行消耗。44项单测及三题公开三轮对照通过；本机缺SDK与Docker daemon，未做平台协议/镜像验收。见 `reports/v7.1_交付_2026-11-24.md`。
++
++> 本文定义"系统长什么样、代码怎么组织、接口怎么对齐"。
++> Phase 1 开始前必须全队过一遍；之后每次改接口都要改本文。
++
++---
++
++## 一、系统全景
++
++```
++                    ┌──────────────────────────────────────────────┐
++                    │              Harness（策略层）                 │
++                    │  观察 → 诊断 → 提案 → 门控 → 执行 → 记账        │
++                    │        ↑                    ↓                │
++                    │   DecisionPolicy: rule / local_llm / pytrio   │
++                    └───────┬──────────────┬───────────────┬───────┘
++                            │              │               │
++        ┌───────────────────▼──┐   ┌───────▼────────┐  ┌───▼─────────┐
++        │   Monitor 漂移监测     │   │  Trainer 训练   │  │ Evaluator   │
++        │  特征分布 + 残差双通道  │   │ 重训/微调/换模型 │  │ 流式评估     │
++        └───────────┬──────────┘   └───────┬────────┘  └───┬─────────┘
++                    │                      │               │
++        ┌───────────▼──────────────────────▼───────────────▼─────────┐
++        │                 DataStream（时间切片，模拟隐藏流）             │
++        └───────────────────────────┬─────────────────────────────────┘
++                                    │
++        ┌───────────────────────────▼─────────────────────────────────┐
++        │  Registry 版本仓（model_id / config_hash / 指标快照 / 回滚）    │
++        └───────────────────────────┬─────────────────────────────────┘
++                                    │
++        ┌───────────────────────────▼─────────────────────────────────┐
++        │  CostLedger 成本账本 ＋ AuditLog 审计日志 ＋ SwanLab 上报       │
++        └─────────────────────────────────────────────────────────────┘
++```
++
++### 闭环状态机
++
++```
++IDLE ──tick──▶ MONITOR ──no drift──▶ IDLE
++                 │
++              drift?
++                 ▼
++             DIAGNOSE ──covariate shift──▶ ACTION(reweight/feature)
++                 │                              │
++           concept drift                        │
++                 ▼                              │
++             PROPOSE ◀──────────────────────────┘
++                 │
++             GATE（收益/成本比、预算、次数、白名单）
++                 │ pass                    │ reject
++                 ▼                         ▼
++             TRAIN/TUNE ──▶ EVALUATE ──▶ PROMOTE ──▶ IDLE
++                              │ fail
++                              ▼
++                           ROLLBACK ──▶ IDLE
++```
++
++> 任何一步异常 → 直接 `IDLE`（保持当前模型），**不允许崩溃**。
++
++---
++
++## 二、目录结构
++
++```
++rsi/
++├── README.md
++├── AGENTS.md
++├── plan0.md / plan1.md
++├── docs/
++├── src/
++│   ├── data/            # 数据加载、时间切片、schema
++│   ├── features/        # 特征工程（复用预提取特征）
++│   ├── models/          # 模型定义、训练、保存
++│   ├── monitor/         # 漂移监测 + 归因
++│   ├── policy/          # 决策策略（rule / llm）
++│   ├── harness/         # 闭环编排、门控、状态机
++│   ├── eval/            # 流式评测、指标、成本
++│   ├── registry/        # 版本仓、回滚
++│   └── utils/           # 日志、配置、swanlab wrapper
++├── configs/
++│   ├── base.yaml
++│   ├── streams/         # 每条流的定义
++│   └── exp/             # 每个实验的配置
++├── scripts/
++│   ├── smoke.py         # 冒烟：1 batch → 1 run
++│   ├── run_stream.py    # 跑一条流
++│   ├── run_matrix.py    # 跑对照矩阵
++│   └── docker_entry.sh  # 镜像入口
++├── data/                # 官方数据（不进 git）
++├── experiments/         # 产物（不进 git）
++└── reports/             # 答辩材料
++```
++
++**规则**：
++
++- 参数只写 `configs/*.yaml`，代码里不出现魔法数字
++- `scripts/` 只做编排，业务逻辑在 `src/`
++- 任何脚本跑完必须自动产生 SwanLab run，不依赖手动
++
++---
++
++## 三、接口契约（先定接口，再各写各的）
++
++> 用 dataclass 定义，Phase 1 第一天落成 `src/schema.py`。
++> 字段可以加，**不能改语义**；改语义必须全队同步并更新本文。
++
++```python
++@dataclass
++class StreamSlice:
++    t: int                  # 时间片编号
++    X: np.ndarray           # 预提取特征（或原始）
++    y: Optional[np.ndarray] # 标签（可能延迟到达/部分缺失）
++    meta: dict              # 工况、设备号、班次等
++
++@dataclass
++class Metrics:
++    perf: float             # 主指标（acc/f1/mae，视任务）
++    perf_delta: float       # 相对静态基线
++    latency_p95: float
++    n_samples: int
++
++@dataclass
++class DriftSignal:
++    t: int
++    feature_score: float    # 0~1
++    residual_score: float   # 0~1
++    is_drift: bool
++    evidence: dict          # 每个特征的 PSI/KS、残差曲线摘要
++
++@dataclass
++class Diagnosis:
++    kind: Literal["covariate", "concept", "none"]
++    confidence: float
++    reason: str             # 给审计日志和答辩用
++    suggested: list[str]    # ["reweight", "retrain", "none"]
++
++@dataclass
++class Action:
++    kind: Literal["none", "retrain", "finetune", "swap_model", "reweight"]
++    params: dict            # 受白名单约束
++    est_cost: float
++    est_gain: float
++
++@dataclass
++class GateDecision:
++    approved: bool
++    reason: str             # "gain/cost=2.1 >= 1.5" / "budget exhausted" / "whitelist reject"
++    action: Action
++
++@dataclass
++class CostRecord:
++    gpu_seconds: float
++    labels: int
++    tokens: int
++    wall_seconds: float
++```
++
++### 成本口径
++
++```python
++def unit_gain_cost(cost, delta_perf, alpha=1, beta=1, gamma=1, eps=1e-6):
++    total = alpha*cost.gpu_seconds + beta*cost.labels + gamma*cost.tokens
++    return total / max(delta_perf, eps)
++```
++
++- α/β/γ 未知时全取 1，**只比较组间相对值**
++- 标注成本按"条"计，Token 按"千 token"还是"token"待 Q5 确认，**先按原始数记，换算在报表层做**
++
++---
++
++## 四、受控 RSI 五件套（架构级，不是可选功能）
++
++| 机制 | 实现位置 | 具体做法 | 验收 |
++|---|---|---|---|
++| 白名单 | `src/policy/whitelist.py` | 动作枚举 `ALLOWED_ACTIONS` + 每个动作的参数名/取值范围 `PARAM_SPEC`；对外部提案（LLM JSON）用 `parse_proposal()`，**永不抛异常**，坏输入一律降级 `none` | `check_guard.py` F1/F2 |
++| 幅度上限 | `src/policy/bounds.py` | 单次变更 ≤ 上版的 `amplitude_factor`（默认 2×），且同一动作最多改 2 个参数；超限截断并记 `bounds_clip` | F4 |
++| 次数上限 | `src/policy/budget.py` | 终身 `max_retrains: 12` + 窗口内 `max_retrains_per_window: 8 / 40 步`（0 = 不限）；超限只能 `none` | F3 |
++| kill-switch | `src/harness/killswitch.py` | `RSI_STOP=1` / `RSI_KILL_SWITCH=1` / `policy.kill_switch: true` / `STOP` 文件 / `max_wall_seconds` 超时 / 连续 `max_consecutive_failures` 次异常；**触发即锁死、不再恢复** | F5/F7 |
++| 审计日志 | `src/utils/audit.py` | 每个 run 一个 `audit.jsonl`，append-only、逐行 flush：`run_start` / `action`（提案 + 门控理由 + 前后指标 + 成本）/ `reject_whitelist` / `reject_budget` / `bounds_clip` / `rollback` / `degraded` / `kill_switch` / `run_end` | F6 |
++
++**唯一闸口**：`src/harness/guard.py` 的 `Gatekeeper.review()`。策略或外部 LLM 只能"提案"，
++放行顺序固定：
++
++```
++提案 → kill-switch（锁死则 none）
++     → 白名单（枚举 / 参数名 / 参数范围 / 单次最多 2 个参数）
++     → 预算（终身次数 + 窗口速率）
++     → 幅度上限（≤ 上版 2×，超限截断）
++     → approved
++```
++
++失败一律降级为 `none`（保持当前冠军），执行后由 `guard.commit()` 记账。审计与门控状态落在
++`<run>/audit.jsonl` 与 `<run>/guard.json`，`summary.json` 里同时留 `guard`/`audit` 摘要。
++
++**验收方式**：故意喂非法动作、超预算、超次数、坏 JSON、断数据，系统都必须**降级而非崩溃**。
++`python scripts/check_guard.py` 覆盖 9 类故障（F1 白名单 / F2 坏 JSON / F3 次数 / F4 幅度 /
++F5 kill-switch 四来源 / F6 断流 / F7 连续异常自动锁死 / F8 数据缺失 / 健康跑到尾），
++退出码 0 = 全部降级成功。
++
++---
++
++## 四点五、平台 Harness 契约（2026-11-20 新增，SDK 1.0.4）
++
++平台只按三种方式调用镜像：`python3 /app/harness.py describe|train|predict`。
++一次 `train` = 一个 **round**（检查点序号从 1 开始）；每数据集 10 轮。
++
++```
++/app          只读  我们的代码 + SDK + harness.py
++/data         只读  train.jsonl / validation.jsonl（当前阶段公开投影）
++/previous     只读  父产物（checkpoint.npz + 代码），摘要平台核验
++/state        只读  上一轮原生状态
++/workspace    可写  候选、状态副本
++```
++
++一轮里必须做的五件事（缺一即失败）：
++
++1. 只从 `/data` 读训练/验证数据；
++2. 从 `/previous/checkpoint.npz` **续训**（权重 + Adam + 标准化参数），不许从零训；
++3. **至少一次真实模型调用** `rnd.model(...)`，`model_call_ids` 不能为空；
++4. `rnd.submit_candidate(...)` 交一个 `/workspace` 下的新目录（含 `checkpoint.npz` + `training.json` + `history.jsonl`）；
++5. `rnd.finish(selected_artifact_id=...)`——可选新候选、父模型或更早产物。
++
++实现位置与契约：
++
++| 文件 | 角色 |
++|---|---|
++| `harness/harness.py` | 官方入口模板，只做命令分发 |
++| `harness/contest_submission.py` | `train(rnd)` / `predict(sample, model_dir)`，失败一律降级"保持父模型"并照常 finish |
++| `src/models/official_round.py` | 续训原语 `continue_round(...)`，**早停 + 保留最佳快照** |
++| `src/policy/strategy.py` | 漂移带 → 动作（none / finetune N 轮 / reweight） |
++| `vendor/contest_baselines/` | 官方训练包副本（镜像自带，不依赖 `data/`） |
++
++`continue_round` 的 `patience>0` 表示：连续 N 个 epoch 没有刷新最佳验证分就停，并保存**最佳那轮**的权重（不是最后一轮）。实测：固定 8 epoch 会把验证分刷到 0.7264 但伪隐藏 batch6 掉到 0.324；
++
++早停 3 epoch 得 0.7257、耗时 0.02s vs 0.08s——**省钱且防过拟合，但不等于提分**。
++
++本地彩排（不消耗平台试运行次数）：
++
++```bash
++python scripts/test_harness_local.py --dataset A --rounds 10 --grow        # 进程内假宿主
++python scripts/test_harness_local.py --dataset A --rounds 3 --docker       # 容器内、--network none
++python scripts/test_harness_local.py --dataset C --rounds 3 --max-train-rows 20000
++```
++
++### 4.6 v2 轮次控制器（2026-11-23 新增）
++
++v1 试运行暴露了四个问题（回归初值、模型回复取不到、无收益仍重训、漂移参考不跨轮），
++v2 把它们收敛到 `src/harness/round_controller.py`，`contest_submission.py` 只做 I/O 与闸门。
++
++**状态 schema 2**（`/workspace/state-round-N/harness_state.json`）：
++
++```text
++metric / direction / baseline / best / last / last_gain / stalled / last_rejected
++n_train / n_validation / stage_id
++profile / baseline_profile / pred_profile      # 分位数直方图 + 预测直方图
++updates / promotions / bounds / budget_steps / audit_events
++decisions[≤10]                                 # 每轮的规则、PSI、模型裁决、前后指标
++```
++
++**预算表**（`choose_budget`，廉价优先）：
++
++| 条件 | 预算 |
++|---|---|
++| 首轮 | A 5 / B 5 / C 3 epoch，lr 2e-3 |
++| 新阶段 + PSI(上轮) ≥ 0.25 | A 3 / B 3 / C 2 |
++| 新阶段 + 输入移动小 | 分类 2 / 回归 4（受上限约束） |
++| 无新数据、指标回落 | A 3 / B 2 / C 2 |
++| 上轮正收益、无停滞 | 分类 1 / 回归 3（校准） |
++| 连续 ≥ 2 轮无收益 | 0（停手） |
++| 停手后数据又增长 | 1（探针） |
++
++**模型裁决**：`extract_text` 依次读 `content` → `reasoning_content` → 数组内容 → `output_text`；
++要求一行 JSON，解析失败记 `model_action=unavailable`。模型只能 `hold` / 收窄 `train` / `rollback`，
++不能放大预算；首轮与“新阶段+强漂移”不允许被 `hold` 掉。
++
++**验收阈值**：分类 `gain ≥ -0.001` 可接受、`≥ +0.002` 才提交；回归相对 RMSE
++`gain ≥ -0.2%` 可接受、`≥ +0.2%` 才提交。被拒候选不上传。
++
++**回放**：`python scripts/replay_trial.py` 把 v1 报告逐轮喂给 `choose_budget`，
++输出 `reports/v2_replay_v1.{md,json}`（反事实，不重新训练）。
++
++---
++
++### 4.7 v4/v5 候选（2026-11-24 新增）
++
++**v4（默认）**：撤销 C 的 145 上限；`clip_regression_prediction` 只保留非负约束。
++同时启用三项工程修复：
++
++- `vendor/contest_baselines/data.py` 特征路径缓存（`lru_cache(2048)` + tuple path）；
++- `summarise_history` 用每轮 `configuration.gain`，不做跨阶段分数差分；
++- `contest_submission` 恢复 `kill_state`，训练成功/失败更新连续失败计数。
++
++**v5（C 校准，可选）**：镜像构建参数 `RSI_C_CALIBRATION=1` 打开；默认 0。
++仅对 24 特征 C 回归生效：
++
++- 只用公开训练集，按第一项运行设置分工况估计传感器均值/方差；
++- 5 节点分段线性残差，每样本最多修正 ±10；未见工况沿用父预测；
++- 参数存于 `Model.meta["c_calibration"]`，随检查点保存；推理只依赖 NumPy；
++- 校准拟合失败时回退到未校准模型，不中断训练。
++
++**构建**：
++
++```bash
++docker build --build-arg RSI_C_CALIBRATION=0 -f harness.Dockerfile -t zhixun-rsi-harness:0.4 .
++docker build --build-arg RSI_C_CALIBRATION=1 -f harness.Dockerfile -t zhixun-rsi-harness:0.5 .
++```
++
++**验收**：30 项单测；`check_guard.py` 9/9；两镜像断网 `describe`；
++`0.5` 的 C 2 轮容器彩排 `calibrate_c=True`；v4/v5 的 C 全量 3 轮 + 23,049 条
++逐条预测与公开结果一致。
++
++---
++
++### 4.8 v8 控制器
++
++SDK 1.0.4 的 `describe/train/predict` 和 NPZ 文件格式不变。C 校准在原有 `meta.c_calibration` 内新增可选 `shifts` 字典，旧检查点未设置时按零偏移读取。内部 `continue_round(..., smooth_weights=False)` 向后兼容；v8 入口显式开启，`training.json` 的 `weight_smoothing` 记录是否采用插值。训练报告中的 epoch/step 仍区分实际执行数与所选快照数。
++
++## 五、实验规范（对应《实验记录规范》，全文待 Q2 确认）
++
++### 5.1 一个实验 = 一次 run
++
++- 一次 run 只改**一个变量**（对照组原则）
++- 同组实验用相同 `group`，不同种子用 `s1/s2/s3`
++- 跑之前先写 `configs/exp/xxx.yaml`，**不允许**命令行临时改参数后不记录
++
++### 5.2 必记字段
++
++见 `03_SwanLab使用与团队协作.md` 第七节。最低要求：`data_version`、`method`、`seed`、`stream`、`model`、`decision_policy`。
++
++### 5.3 禁止
++
++- 本地跑完再手动补录（容易漏、容易编）
++- 用不同数据版本的结果放在同一张对比表里
++- 只保留最好的一次，删掉失败的 run（失败也是证据）
++
++---
++
++## 六、提交物规范
++
++### 6.1 系统镜像
++
++- 入口：`docker run <image>` 直接跑完一条流，**不需要传一堆参数**
++- 自包含：权重、依赖、特征提取器、兜底模型全在镜像里
++- 离线：无任何出网调用（可用 `strace` / 断网机器验证）
++- 资源：CPU/内存/超时按未知规范取保守值，预留 30% 余量
++- 日志：标准输出 + 落盘 `run.log`，方便评审排查
++- 退出码：成功 0；失败也要输出"保持当前模型"的结果，**不要非 0 退出**
++
++### 6.2 系统运行说明文档（`reports/系统说明.md`）
++
++1. 系统做什么（一段话）
++2. 架构图 + 数据流
++3. 如何运行（一条命令）
++4. 资源需求与耗时
++5. 决策逻辑与受控机制
++6. 实验记录在哪看（SwanLab 链接 + 项目结构说明）
++7. 已知限制
++
++### 6.3 实验记录
++
++- 链接：团队项目 URL
++- 查询依据：项目名、关键 run 名清单、对照矩阵表
++- **提交前用无痕窗口验证链接公开可访问**
++
++---
++
++## 七、代码规范（轻量，够用即可）
++
++- Python 3.10+，`from __future__ import annotations` 可选
++- 全部随机源固定种子（`random` / `numpy` / `torch`）
++- 配置用 YAML + dataclass 校验，禁止 `**kwargs` 满天飞
++- 日志用 `logging`，不要 `print`（镜像里 print 会被吞）
++- 类型注解覆盖公共接口
++- 每个模块一个 `README` 或在文件头写 3 行说明
++- 提交信息：`[阶段] 动词 + 对象`，例：`[p1] add stream evaluator`
++
++### 开发环境一致性
++
++- `requirements.txt` 锁版本（`pip freeze`）
++- 可选：`Dockerfile.dev` 供开发用，避免"我这儿能跑"
++- Windows 开发 + Linux 评测：路径一律 `pathlib`，不要写死 `\`
++
++---
++
++## 八、测试与验收
++
++| 层级 | 内容 | 何时 |
++|---|---|---|
++| 冒烟 | `scripts/smoke.py` 跑通 | 每天 |
++| 流测试 | 4 条合成流各跑一遍 | 每次改策略 |
++| 故障注入 | 5 类故障 fallback | 11-24 前 |
++| 离线 dry-run | 断网 + 限资源 + 隐藏流 | 11-25 与 12-02 |
++| 复现测试 | 换机器跑基线，结果一致 | Phase 1 出口 |
++
++**验收原则**：判据写成"命令 + 期望输出"，不写"完成"。
++
++例：
++
++```bash
++python scripts/run_stream.py --config configs/streams/gradual.yaml
++# 期望：退出码 0；experiments/<run_id>/metrics.json 存在；
++#       cost.json 中 unit_gain_cost > 0；SwanLab 出现 1 条 run
++```
++
++---
++
++## 九、待确认的工程问题
++
++| # | 问题 | 影响 |
++|---|---|---|
++| E1 | 镜像的基础镜像/入口/资源上限 | Dockerfile 怎么写 |
++| E2 | 评测总超时 | 策略能跑几轮 |
++| E3 | 是否断网、断网程度 | 能否用本地 LLM |
++| E4 | 评测机是否预置 Qwen3.8-27B | 镜像体积 |
++| E5 | 标注配额怎么算（请求即计 / 使用才计） | 主动学习是否可行 |
++| E6 | Token 计量口径（输入/输出/缓存是否分别计） | 成本优化方向 |
++
++→ 全部登记在 `docs/open_questions.md`。
+--- a/docs/status.md
++++ b/docs/status.md
+@@ -1,560 +1,562 @@
+-> 2026-11-25 更新：v15 本地候选已交付。仅调整 C 的后期预算/有界探针，保留 v14 校准与门禁；85 项测试通过，固定公开 C 十轮 NASA -4.43%、RMSE +0.13%。未做平台/SDK/容器验收。详见 [v15交付](../reports/v15_交付_2026-11-25.md)。以下为历史记录。
+-
+-# 项目进度快照
+-
+-<!-- latest-trials -->
+-A/B/C 按最新交接与正式评测步骤各占三分之一；已测版本继续以 v5 作为整体参考，v6 仅作对照。v7.1 为本地工程修复候选，尚无平台成绩、未启动试运行。详见 [v7.1交付](../reports/v7.1_交付_2026-11-24.md)。
+-<!-- /latest-trials -->
+-
+-> 每次会话/每周例会结束更新。最新的在最上面。
+-> 格式固定，方便 agent 与人快速接手。
+-
+-## 2026-11-24：v14 融合 `v9.2` 与 `v13` 优点（`res_mlp_v2` + 分组观测 + 完整审计）
+-
+-- **融合目标（分支 `v14`，发布默认 `RELEASE=0.14`）**：以通过全量单测与线上复盘修复的 `v9.2` 为完整底座，吸收 `v13` 的有效创新并修补 `v13` 的边界瑕疵与工程漏项：
+-  1. `vendor/contest_baselines/c_calibration.py`：新增 `res_mlp_v2` 模式，在 `v9.2` 双向残差 MLP（`[-120, +42]`、`over_boost=1.15`、`_best_shift_asym`）基础上，融合 `v13` 的**分工况标准化 `parent_moments`**（全局 + 分工况双尺度 `p_norm`）与**端点线性修正 `_fit_endpoint`**（收紧至 `rmse_tol=0.002`、`grid=[-6..8]`），并修复 `v13` 两处边界问题：`_fit_endpoint` 评估候选时保持 `np.maximum(0.0, ...)` 非负一致、推理时 `endpoint` 仅作用于已知工况（`known`）以保证未知工况完全回退父模型；保留 `v8`/`spline_v2`/`res_mlp_v1` 向后兼容。
+-  2. `vendor/contest_baselines/data.py` & `harness/contest_submission.py`：合入 `v13` 的 C-MAPSS `FD001..FD004` 分组提取（`meta.source_subset` / ID 正则）并在 `rnd.dataset_key in ("B", "C")` 传入观测性 `validation_groups`；补齐 `selection_audit` 对 `0.9.1`/`0.9.2`/`0.14` 的输出；同步保留 `v9.2` 的 3-epoch 新阶段预算修复、C 组 `nasa_bonus` 门控与中间 epoch 校准节流。
+-  3. `harness.Dockerfile`：默认 `ARG RSI_RELEASE=0.14`，与代码默认严格对齐。
+-- **本地验证**：
+-  - 77 项单元测试与 5 核心模块 `py_compile` 全通过；
+-  - 同父检查点公开 C 组消融（113,089 训练行 / 496 台发动机，23,049 验证行）：VAL RMSE `47.010`、NASA `1.027e9`（`logN=20.750`，较 `v9.2` 的 `1.277e9` 降 **19.6%**，较 `v13` 完整激活的 `1.589e9` 降 **35.4%**，较 `v8/v9` 的 `3.857e9` 降 **73.4%**）；3 折按发动机 OOF RMSE `52.326`、`logN=28.650`（较 `v9.2` 再降 11.2%，较 `v13` 降 61.6%）；
+-  - 真实公开 A/B/C 3 轮闭环：A/B 零回归（检查点 SHA256 与指标完全一致）；C 组 3 轮后 VAL RMSE `51.550 → 46.919`、MAE `36.820 → 33.591`、NASA `5.040e9 → 9.830e8`（`logN 22.341 → 20.706`，**-80.5%**；较 `v9.2` 3 轮后的 `1.309e9` 再降 **24.9%**），3 轮总耗时 `7.71s`，批量 vs 逐行最大差 `5.68e-14`。
+-
+-## 2026-11-24：v9.2 基于网页评测报告的 C 组全面修正（`res_mlp_v1` + 控制器 + CPU 节流）
+-
+-- **线上复盘根因（对比 8 次平台试运行，重点对照 Run 0 `0.9` / Run 1 `0.7.2` / Run 3）**：
+-  1. `0.9` 在 C 隐藏集 NASA 反升至 `115.91B`（`0.7.2` 为 `79.52B`，Run 3 为 `67.41B`），主因是 `v8/v9` 校准器给 `target < 0` 加权 `1.35` 并叠加 `[-3.5, +0.5]` 负向平移，而真实 C 组 NASA 97%+ 由极端**低估尾部**主导，单向压低适得其反；
+-  2. `0.9` 的 `c_stage_probe` 将 `C-stage-02/03/04`（R4/R7/R9）新阶段预算砍成 `1 epoch`，导致 R9 虽已实现 RMSE（`50.468→50.443`）与 `nasa_log1p`（`23.191→23.066`）双降仍因未过门槛被拒，全程停留在 R3 旧检查点；
+-  3. `official_round.py` 每 epoch 重复全量拟合校准器，使 `0.9` 线上校准 CPU 达训练本身的 ~6.5 倍。
+-- **本轮修改方向（分支 `v9.2`，发布默认 `RELEASE=0.9.2`）**：
+-  1. `vendor/contest_baselines/c_calibration.py`：保留 `res_mlp_v1` 双向工况残差 MLP（`[-120, +42]`）与 `spline_v2` 备选，按 3 折 OOF 消融将 `over_boost` 从 `1.65` 回调至 `1.15`（避免隐藏集低估雪崩，同时保留温和防高估），并将 `_best_shift_asym` 搜索网格从 49 点精简至 25 点；
+-  2. `src/harness/round_controller.py`：`NEW_STAGE_EPOCHS["C"]` 与 `c_stage_probe` 恢复至 `3 epochs`（对齐 `0.7.2` 在 R4/R9 晋升的表现）；C 组 `nasa_bonus` 放宽为 `gain >= 0.0 and delta <= -0.08`（RMSE 不退步且 NASA 降幅 ≥7.7% 即允许晋升）；
+-  3. `src/models/official_round.py`：非 `v8` 校准模式在多 epoch 续训中跳过未校准验证 RMSE 明显退化（`> 1.005×best`）的中间 epoch 重拟合，降低线上 CPU 开销，同时保持 `v8` 路径字节级不变。
+-- **本地验证**：76 项单元测试与 4 模块 `py_compile` 全通过；真实公开 C 组 3 轮闭环（`verify_upgraded_repo.py`）：VAL RMSE `50.325 → 46.976`（-6.7%）、MAE `36.302 → 33.653`（-7.3%）、NASA `2.806e9 → 1.267e9`（**-54.8%**，`logN 21.755 → 20.960`）；3 折按发动机 OOF RMSE `54.087 → 52.080`、`logN 31.009 → 28.863`（**-88.3%**）；A/B 零回归（检查点 SHA256 与指标完全一致）；批量 vs 逐行最大差 `8.5e-14`。尚待平台试运行验收隐藏集表现。
+-
+-## 0.9 本地候选：三题同轮约束选模
+-
+-- 保留 v8 的优化器、请求预算和输出策略；A 允许持平，B/C 先检查同轮可晋升性再选快照。增加 CPU 分项计量、父子指标、C 尾部复核和无需平台的配对验收工具。证据和使用方法见[候选说明](../reports/版本方案/同轮约束选模.md)。
+-- 仅完成本地机制验证；没有运行官方公开包完整轨迹或隐藏试运行，不据此修改正式推荐。
+-
+-## v8 源码候选：预算约束下的更新与选模
+-
+-- 基于 `16f1620` 实现回执解析、C 分工况风险偏移、B/C 晋升门控和可选权重平滑。约束和冲突取舍见 [v8 版本说明](../reports/版本方案/v8.md)。
+-- 本地 Python 3.12 + NumPy：原 44 项与新增 16 项测试全部通过，6 个指定模块通过 `py_compile`。未运行官方 SDK、构建赛事镜像或消耗平台次数；尚无平台成绩，不替代 v5。
+-- 下一步：固定公开阶段做单模块消融，分别核对 A/B/C、CPU、token 与真实模型回执。
+-
+-## 2026-11-24：v7.1 本地发布安全修复
+-
+-- 采用新源码包基线，未合入旧cap130/绝对NASA门禁。A沿用v7预算与容差；B/C无固定上限，C工况校准默认启用。
+-- 修复v7依赖环境开关、Docker却默认0.6的陷阱。预测不随RSI_RELEASE变化；显式校准开关0可关闭新拟合。
+-- 模型失败/空响应/坏结构降级规则，记录回执状态、finish_reason、字段名和错误类型，不记录异常消息、不伪造成功调用。
+-- schema3持久化真实行数历史；新增NASA稳定对数求和与B逐轴承观测，不改变选模。早停报告区分保存快照和执行消耗。
+-- 44项单测、8模块py_compile通过。真实公开A/B/C各3轮新旧对照：检查点/批量预测哈希、晋升序列一致；逐条与批量最大差<1e-12。此为本地替身宿主，不是SDK验收。
+-- 旧check_guard未通过：输入包缺src.data，F6/F7/healthy报ModuleNotFoundError。没有补造加载器或改断言；.gitignore仅忽略根data，避免忽略src/data，npz权重仍忽略。
+-- 本机无SDK和Docker daemon；没有远端、平台或SwanLab云端写入。见 `reports/v7.1_交付_2026-11-24.md` 和 `reports/数学分析更新_2026-11-24.md`。
+-
+----
+-
+-## 2026-11-23：P0 源码交付与数学不可行性诊断（并行分支）
+-
+-- 本地 `fix/cap-nasa-gate`：C24 特征回归按请求 `min(0.9*max(value,0),130)`；服务输出 NASA>1e6 或 >父分 1.2 倍拒绝晋升，另报原始 NASA；schema3 增加 rows/rows_history/data_grew 并兼容 n_train。
+-- 9 项 LLM 兼容、5 项预测入口、33 项控制器/安全测试全通过，入口 `py_compile` 退出 0；没有新增依赖。真实续训合成接线验证父模型保留、审计、save_state 和 finish，不冒充 SDK 全流程。
+-- 附件 3 显示 v3 已完成：C MAE 43.787114 / RMSE 62.881078 / NASA 2.440040142e12；A 仍约 0.8674。仓库下面“v3 正在跑”为历史状态。
+-- 公开 C 基线验证 23,049 行、最大真值 434、9,163 行 >130；原始 NASA 5.8234e9，cap145 后 7.3670e10，指定新策略后 2.3263e11。cap130 与 NASA 1e6 门禁不可行，候选将被冻结；**没有达到平台验收，不建议直接消耗试运行**。
+-- 附件 2/3 模型裁决各 30/30 unavailable，有效 LLM 覆盖率 0；不能把 A 从 0.8735 降到 0.8674 归因于 LLM。保持 A 代码与 P1 策略不变，后续先做固定预算消融。
+-- 附件 2 配置的 0 epoch 实为 B 第 4/6/7 轮、C 第 5/6/8/10 轮，共 7/30；“未训练/保留父模型”的页面文案还包含已训练但未晋升情形。
+-- 阻塞：历史镜像 OCI digest/检查点哈希不可得；新检出缺 SDK，Docker daemon 未运行，尚未做 SDK/容器验收。未推送 PR、上传、试运行或补录 SwanLab。
+-- 详细交付、风险回退与 PR 描述草案：`reports/P0_交付_2026-11-23.md`；数学专项：`reports/数学建模与优化报告.md`。
+-  **这两个文件在并行分支 `fix/cap-nasa-gate`，未合并到本仓库**，引用时注意。
+-
+----
+-
+-## 2026-11-24（00:40）：v4/v5 本地审计完成，平台版本已建、未试运行
+-
+-### 结论
+-
+-- **A/B 冻结**：A 的 -0.69% 暂按可接受处理，不做 A 预算消融；B 的 251.70 不动。
+-- **v4**（无上限 + 三项工程修复）与 **v5**（v4 + C 工况校准）都已完成本地全链路验证，
+-  平台版本 4/5 均 `valid`；**v2 仍是正式候选**。
+-- 没有消耗新的试运行：trial 已用 3/10，正式评测 0/3。
+-
+-### C 公开验证（23,049 条，同阶段第 3 轮模型）
+-
+-| 方案 | MAE | RMSE | NASA |
+-|---|---:|---:|---:|
+-| v4 无上限 | 37.856 | 51.691 | 4.321×10⁹ |
+-| **v5 校准 ±10** | **36.536** | **50.049** | **2.378×10⁹** |
+-| 变化 | -3.5% | **-3.18%** | **-44.97%** |
+-
+-- 四个 FD 子集 RMSE 均下降；NASA 在 FD001/FD004 下降、FD002/FD003 略升；
+-- 训练/验证发动机无交集；校准只用公开训练集、推理只用 NumPy；
+-- 全量 113,089 行、3 轮 SDK、23,049 条逐条 `predict()` 已验证；隐藏收益未验证。
+-
+-### 工程修复
+-
+-| 问题 | 修复 | 验证 |
+-|---|---|---|
+-| 特征路径重复编码 | `lru_cache(2048)` + tuple path | 六个文件读取 CPU 23.13→7.56 s（-67.3%），本机复测 23.54→7.94（-66.3%） |
+-| 历史增益写反 | 用每轮 `configuration.gain` | v3 C 第 1 轮由 -10.701% 修正为 +0.9805%；60 条记录核对 |
+-| 连续失败不熔断 | 恢复 `kill_state`，成功/失败计数 | 3 次失败后第 4/5 轮零预算；单测 30 项 |
+-
+-### 平台版本
+-
+-| 版本 | 镜像 | submission id | 状态 |
+-|---|---|---|---|
+-| v4 | `zhixun-rsi-harness:0.4`，archive `47311235…` | `d4ba36296650c173917634d0ab38f105` | valid |
+-| v5 | `zhixun-rsi-harness:0.5`，archive `938ccaab…` | `5a45bc60cf3f4ea34b35a3fa1f99bd4d` | valid |
+-| v2 | 正式候选 | `8636a3dcbc…` | valid，已有平台成绩 |
+-
+-- 容器：`0.4` A 2 轮、`0.5` C 2 轮断网彩排 exit 0；`describe` 均通过；
+-- 单测 30 项、`check_guard.py` 9/9 PASS；
+-- 平台文档 `系统说明.md` 已更新到 v4/v5 状态。
+-
+-### 下一步
+-
+-1. **先试运行 v4**（1 次）：验证撤销 145 后 C 回到 v2 水平，A/B 不变；
+-2. **再试运行 v5**（1 次）：只验证 C 校准，比较 MAE/RMSE/NASA/CPU；
+-3. 若 v5 平台退化，保留 v4/v2；若改善，再把 v5 选为正式候选；
+-4. 剩余 7 次试运行留给重复/最终确认，正式评测 3 次不动。
+-
+----
+-
+-## 2026-11-23（23:40）：v3 完成，C 的 145 上限被实测证伪
+-
+-### 平台结果（run `27143ad15abd6f1a4daf998200625545`，submission v3，镜像 0.3）
+-
+-| 数据集 | v2 | v3 | 变化 |
+-|---|---:|---:|---:|
+-| A macro-F1 | 0.8674 | 0.8674 | 0（A/B 与 v2 逐位相同） |
+-| B MAE / RMSE | 251.70 / 352.08 | 251.70 / 352.08 | 0 |
+-| C MAE（循环） | 41.12 | **43.79** | +6.5% |
+-| C RMSE | 56.38 | **62.88** | +11.5% |
+-| C NASA | 8.85×10¹⁰ | **2.44×10¹²** | **27.6×** |
+-| 总 epoch | 66 | 66 | 0 |
+-| 墙钟 / CPU | 3,917 s / 3,044 s | 3,730 s / 3,075 s | -4.8% / +1.0% |
+-
+-### 结论
+-
+-- v3 只改了 C 的 `min(value,145)`，A/B 逐位相同，所以 C 的变差可以归因到上限；
+-- C 的 RUL 真值最大 **542**，公开验证集 **33%** 的样本 >145；上限把真实高 RUL 压成低估，
+-  NASA 对低估也是 `exp(-d/13)-1`，所以从 8.85×10¹⁰ 变成 2.44×10¹²；
+-- **145 这个参数被实测证伪，不是“再调大一点”的问题**：v4 直接移除上限；
+-- 资源没有明显收益（epoch 相同，CPU +1%），说明上限只改变预测，不改变训练。
+-
+-### 下一步（冻结 A/B，C 先无上限、再校准）
+-
+-1. **v4：只移除 C 的 145 上限 + 三项工程修复**，A/B 预算保持 v2；
+-   跑 1 次试运行，预期 A 0.8674、B 251.70、C 回到 41.12/8.85×10¹⁰。
+-2. **v5：在 v4 上只加 C 工况校准**（±10），A/B 不动；
+-   跑 1 次，比较 C 的 MAE/RMSE/NASA 和 CPU；隐藏收益未验证，不得直接替换 v2。
+-3. **A/B 冻结**：不再做 A 预算消融，不用平台次数追 0.006；B 的 251.70 不动。
+-4. v2 继续作为已有平台成绩的正式候选；v4/v5 只有平台验证后才替换。
+-5. 剩余 7 次试运行留给重复/最终确认；正式评测 3 次不动。
+-
+-### 新增事实
+-
+-- **Q23**：C 的 RUL 真值最大 542（公开训练集），145 上限会切断 33% 的真实高 RUL；
+-  任何“尾部上限”必须 ≥ 训练集 99.5 分位（419）或直接去掉。
+-
+----
+-
+-## 2026-11-23（22:30）：v2 试运行完成，B 指标减半、资源减半
+-
+-### 平台结果（run `2b638d5aa090722ebc32e1c3f577e000`，submission v2）
+-
+-| 数据集 | v1 | v2 | 变化 |
+-|---|---:|---:|---:|
+-| A macro-F1 | 0.8735 | 0.8674 | **-0.0060（-0.69%）** |
+-| A accuracy | 0.8795 | 0.8729 | -0.0065 |
+-| B MAE（分钟） | 506.67 | **251.70** | **-50.3%** |
+-| B RMSE | 708.58 | **352.08** | **-50.3%** |
+-| C MAE / RMSE | 41.12 / 56.38 | 41.12 / 56.38 | 0（同一模型） |
+-| C NASA | 8.85×10¹⁰ | 8.85×10¹⁰ | 0（0.2 镜像无上限） |
+-| 总 epoch | 119 | **66** | -44.5% |
+-| CPU 秒 | 3,229 | 3,044 | -5.7% |
+-| 墙钟秒 | 8,160 | 3,917 | **-52.0%** |
+-| training_seconds | 4,471 | 2,016 | **-54.9%** |
+-| total tokens | 22,366 | 32,087 | +43% |
+-
+-### 完成
+-
+-- v2 三题各 10 轮全部完成，`training_complete=true`；
+-- **B 收益最大**：MAE/RMSE 减半；v2 在 B 第 2/3/8/9 轮拿到正收益，最终选中第 9 轮；
+-- **A 小幅回落**：总 epoch 28→23，部分新阶段只给 2 epoch；A 的新阶段预算需要调回 3；
+-- **C 完全没变**：v2 最终仍选第 3 轮模型，停手只省了 23 epoch，没改变产物；
+-- 停手规则生效：B 第 4/6/7 轮、C 第 5/6/8/10 轮 `epochs=0`（共 7/30 轮）；
+-- 回放预测省 56 epoch，实际省 53 epoch，基本吻合；
+-- **模型裁决仍全是 `unavailable`**：`content`/`reasoning_content` 都没有文本，reason 如实写
+-  “无文本，按规则执行”；没有伪造模型判断，但“自主决策”的展示素材仍不足。
+-
+-### 进行中
+-
+-- **v3 试运行**（run `27143ad15abd6f1a4daf998200625545`，submission v3，镜像 0.3）
+-  已启动，A/B 完成、C 训练中；它带 C 题 145 上限，重点看 NASA 是否下降。
+-
+-### 下一步
+-
+-1. 等 v3 报告：重点看 C NASA、B 是否守住 251.70、A 是否回到 0.87 以上；
+-2. 若 A 仍低于 v1，把 A 的新阶段预算从 2 调回 3（只动 A）；
+-3. 用 v2 的“B 减半 + 资源减半”做技术报告/视频主线，C 等 v3；
+-4. 正式评测前再确认版本与记录链接的对应关系。
+-
+-### 决策日志
+-
+-| 日期 | 决策 | 理由 | 证据 |
+-|---|---|---|---|
+-| 2026-11-23 | 保留 v2 的停手规则，不回退到“每轮都训” | v2 实测省 53 epoch、B MAE 减半；C 没变但也没变差 | `reports/trial_runs.md`、v2 report |
+-| 2026-11-23 | A 的新阶段预算待 v3 后再调，不立刻改 | v3 已经在跑，先看同一套预算在 0.3 上的 A 结果，避免同时改两个变量 | v3 run `27143ad1…` |
+-
+----
+-
+-## 2026-11-23：v1 试运行复盘 + v2 控制器与第二次提交准备
+-
+-### 完成
+-
+-- **读回 v1 试运行报告**（`_state/trial_report_completed.json`）：A/B/C 各 10 轮全部 `finish`
+-  - A：macro-F1 **0.8735** / accuracy 0.8795，CPU 993 s，wall 2662 s
+-  - B：MAE **506.67** 分钟 / RMSE 708.58，CPU 368 s，wall 1968 s
+-  - C：MAE **41.12** 循环 / RMSE 56.38，CPU 1868 s，wall 3530 s
+-  - 三个待查点：`/data` 按阶段变化（A 8 段 / B 3 段 / C 4 段）、父检查点路径稳定、10 轮都完成
+-- **定位 v1 四个缺陷**：回归 `best_val` 初值 0；Qwen 回复在 `reasoning_content` 而只读 `content`；
+-  C 第 4–10 轮 / B 第 3–10 轮候选被拒仍重训；漂移参考不跨轮、预测 JS 恒 0
+-- **v2 轮次控制器** `src/harness/round_controller.py`：跨轮参考画像、历史回读、模型裁决可读/可收窄、
+-  相对 gap、停手/探针、相对验收阈值；`harness/contest_submission.py` 接入 Gatekeeper 五件套
+-- **状态 schema 2**：`profile/baseline_profile/pred_profile`、`best/last/last_gain/stalled`、
+-  `decisions[≤10]`、`bounds/budget_steps/audit_events`
+-- **测试**：`tests/test_round_controller.py` 23 项全 PASS
+-- **彩排**：进程内 A 10 轮、B 3 轮、C 3 轮（含回归路径）、C 全量首轮 45k 行
+-  （RMSE 52.87→52.00，+1.65%，采纳）；容器内 `--network none` A 3 轮全 exit 0
+-- **回放**：v1 报告 119 epoch → v2 63 epoch（-47%），估计少 1291 CPU 秒（-40%）；
+-  A 不省（更新都有收益），B/C 主要省在“被拒还重训”的轮次
+-- **v2 镜像**：`zhixun-rsi-harness:0.3`（285 MB，tar 64 MB）已构建、断网 describe 通过；
+-  `dist/zhixun-rsi-harness-0.3.tar` 已导出
+-- **平台动作**：镜像已上传：v2 初版 archive `88f5afb…`、**v3 最终版** archive
+-  `880b0fd503abcc04b0d49433c15eeafb`（均 ready）；提交版本 v2（`8636a3d…`）与
+-  **v3 最终版**（`b318577fbc02cdfeb8504ac94c707c10`）均 `status=valid`。
+-  v3 = 0.3 镜像 + 含 C 题 145 上限的文档；两个版本都未消耗试运行次数。
+-  首次校验曾返回 `模型服务暂不可用`，退避约 2 分钟后重试成功。
+-- **材料**：`reports/技术报告_v2.md`、`reports/来源声明.md`、`docs/演示视频分镜.md`、
+-  `reports/v2_replay_v1.{md,json}`、`reports/trial_runs.md`、`reports/系统说明.md` 已更新
+-
+-### 待办（第二次提交）
+-
+-1. ~~上传 `dist/zhixun-rsi-harness-0.3.tar`~~ ✅（archive `880b0fd…`，ready）
+-2. ~~新建提交版本~~ ✅（v2 `8636a3d…` 中间版；**v3 `b318577…` 最终版**，均 valid）
+-3. **选 1 次试运行**（trial 已用 1/10；上传/建版本/校验都不扣次数）→ 看 A/B/C 的
+-   `decision`、C 是否停止白训、模型裁决是否仍有文本
+-4. 录演示视频（按 `docs/演示视频分镜.md`，≤5 分钟）
+-5. 确认试运行报告后再决定「选为正式版本 + 开始正式评测」
+-   （平台 `#teams` 显示 `formal_limit=3`，与交接单写的 2 次不一致，以平台为准）
+-
+-### 新增问题 / 事实修正
+-
+-- **Q21**：C 的 NASA 分数在 v1 报告中为 8.85e10，指数惩罚对严重高估极敏感；
+-  v2 已对 24 特征回归输出加 145 上限，效果待下一次试运行验证。
+-- **Q22**：v2 首次校验返回 `模型服务暂不可用，请稍后重试`；退避约 2 分钟后重试成功，
+-  状态变 `valid`。短时间重复请求会 409 `校验请求过于频繁`，不要连续点。
+-- 平台 `formal_limit=3`（`formal_remaining=3`），不是交接单里写的 2；试运行 `trial_used=1`。
+-- 第一次试运行（`41d6c1d6…`）平台侧失败，同版本重跑后完成；失败不占次数。
+-- **事实修正（SwanLab）**：`x5kz5fn7` 是本地 `simulate_a_rounds.py` 的 **static 模拟**
+-  （val 0.7140、test_mean 0.399、test_worst 0.185、**0 updates**），不是平台测评；
+-  `rynlo0ne`（trigger）在 `reports/sim_a_rounds.json` 里同样 **0 updates**。
+-  因此旧交接单里“trigger 隐藏-like 0.339 / 多训 = 负收益”的结论**没有当前 JSON 支撑**，
+-  且平台 A 实测 0.8735 说明 batch 3–10 不是可靠的 hidden 代理；v3 已不拿它设计平台预算。
+-
+-### 下一步
+-
+-- v2 平台试运行 1 次 → 按报告决定是否调 C 预算 → 正式评测。
+-- 若模型仍无文本：保持“规则执行 + `model_action=unavailable`”的诚实记录，不伪造裁决。
+-
+-### 阻塞
+-
+-- 上传/试运行/正式评测需要人工确认；无技术阻塞。
+-
+----
+-
+-## 2026-11-20（第五段）：平台提交完成，首次试运行已排队
+-
+-### 完成
+-
+-- 镜像上传成功（`zhixun-rsi-harness:0.1`，64 MiB）；**提交版本 v1 已校验通过**
+-- 表单填写：基础模型 **Qwen/Qwen3.5-4B**、训练记录 = SwanLab run `x5kz5fn7`、
+-  源码 = `github.com/AliceJiuyuansi/rsi-zhixun-harness`（已 public）、PyTRiO key（新建）、
+-  作品文档 = `reports/系统说明.md`
+-- **首次试运行已提交**（trial，排在第 4 位；监视脚本 `_state/watch_run.py`，日志 `_state/run_watch.log`）
+-- SwanLab：项目 `rsi-zhixun` 两条真实 run（static / trigger 十轮模拟，56 条记录已上传）
+-- 新写 `docs/交接_2026-11-21.md`（明天一页上手）；`reports/系统说明.md`（提交三件套之一）
+-
+-### 待办（明天从交接单开始）
+-
+-1. 看试运行报告的 3 件事：每轮 `/data` 行数、父检查点路径、10 轮是否都 finish
+-2. 按报告调 `decide_training_budget()`
+-3. 技术报告 ≤10 页 / 演示视频 ≤5 分钟 / 来源声明
+-4. 确认后再考虑「选为正式版本 + 首次正式评测」（2 次机会）
+-
+-### 阻塞
+-
+-- 试运行排队中（平台侧）；正式评测需人工确认
+-
+----
+-
+-## 2026-11-20（第四段）：平台开放、Harness 镜像、A 任务本地闭环
+-
+-### 平台事实（登录后从页面/SDK 抓到的，可直接当已知条件）
+-
+-- 平台 `rsi-index.115.zone` 已开放，账号 `Richard1037` 登录成功；队伍 1 支、提交版本 0、评测 0
+-- **每数据集 10 轮续训**；**试运行 10 次/队**（每次 = 一次完整"训练+评测"= 10 轮，累计不重置）；
+-  **正式评测 2 次**（第 1 次自助、第 2 次需审批）；上传镜像/新建版本**不扣次数**
+-- SDK 1.0.4：入口 `python3 /app/harness.py describe|train|predict`；`dataset_key` 只接受 A/B/C；
+-  `/data`、`/previous`、`/state` 只读，`/workspace` 可写；**每轮必须至少一次真实模型调用**
+-- 评分：客观 35（平均提升 15 / 最差阶段 5 / 恢复 5 / 稳定性 5 / 资源效率 5），
+-  专家 65（自主决策 10 / 漂移检测 8 / 安全 6 / 系统 6 / 技术报告 6 / 路线 6 / 受控实验 5 /
+-  实验记录 5 / 记录分析 5 / 工业约束 4 / 答辩 4），加分 10（扩展数据验证 5 + 技术创新 5）
+-- 硬要求新增一条：**至少 3 次"读历史—做实验—依据结果决策"的完整记录**
+-
+-### 完成
+-
+-- **A 任务数据核对**：`gas+sensor+array+drift+dataset (1)/Dataset/batch{1..10}.dat`
+-  与官方 `train.jsonl`(445)/`validation.jsonl`(1244) **逐位相同**（maxdiff=0.0），类别映射正确
+-  → batches 3–10（12,221 条）是合法的"伪隐藏集"，**只许考、不许练**
+-- **官方基线精确复现**：20 epoch → macro-F1 `0.7140297220788709`（与官方 training.json 16 位一致）
+-- **漂移曲线**（`reports/gas_baseline_drift.csv`）：batch1 0.956 → batch2 0.714 → batch9 0.185
+-- **续训适配器** `src/models/official_round.py`：`continue_round()` 从父检查点续训，
+-  记录父子摘要、逐 epoch 历史；新增**早停 + 最佳快照**
+-- **策略表** `src/policy/strategy.py`：PSI×掉分 → none / finetune(3/4/5 ep) / reweight，全部过白名单
+-- **十轮模拟** `scripts/simulate_a_rounds.py`：static 隐藏-like 均值 0.399 / 最差 0.185；
+-  periodic 验证刷到 0.7255 但隐藏-like 掉到 0.339 → **多训 = 负收益（过拟合旧分布）**
+-- **Harness 镜像** `zhixun-rsi-harness:0.1`（linux/amd64，285 MB，tar 64 MB）：
+-  `harness/harness.py` + `harness/contest_submission.py` + `vendor/contest_baselines/`
+-- **本地彩排** `scripts/test_harness_local.py`：进程内假宿主 + **容器内 `--network none`**
+-  跑完 describe/train(2 轮)/predict，全部 exit 0；不消耗平台次数
+-- `scripts/prepare_gas.py` → `data/processed/gas/gas_all.npz` + manifest（可追溯哈希）
+-
+-### 未完成
+-
+-- 镜像**未上传**、未跑试运行（会消耗 1/10 次，需本人确认）
+-- `reports/系统说明.md`、技术报告、演示视频、来源声明未写
+-- `docs/open_questions.md` Q20（10 轮数据是否变化）待问
+-- 训练配方（噪声增强 / 权重平均）未实验；`src/harness/loop.py` 的逐 step 内核尚未接进 `contest_submission.py`
+-
+-### 下一步
+-
+-1. 上传 tar → 新建提交版本 → **试运行 1 次**（同时验证 Q20）
+-2. 按试运行报告修 `decide_training_budget`
+-3. 写系统说明 + 技术报告（用漂移曲线和十轮模拟作图表）
+-
+-### 阻塞
+-
+-- 报名/推荐状态（人）；企业赛 PyTRIO 额度
+-
+----
+-
+-## 2026-11-20（第三段）：官方三任务接入路径
+-
+-### 完成
+-
+-- 收到官方任务口径：A 气体识别（6 类 / Macro-F1）、B 轴承健康（RUL 分钟 / RMSE+MAE）、
+-  C 发动机寿命（RUL 循环 / RMSE + NASA 非对称评分）
+-- `docs/08_三任务落地路径.md`：三任务身份推断（UCI Gas Drift / FEMTO-ST PRONOSTIA / C-MAPSS）、
+-  复用度对照、看不懂数据时的侦察三步 + 通用特征四族、指标/阈值/loader 改造清单、三天计划
+-- 新增 Q16–Q19（三选一还是全做、指标口径与单位、公开集划分、能否用公开原版预训练）
+-
+-### 关键判断
+-
+-- 系统零重写：换的是**数据加载器 / 指标函数 / 阈值量纲**三样
+-- B 复用度最高（已有 XJTU-SY 全链路）；A 需 macro-F1；C 需新 loader + 非对称评分
+-- 阈值必须相对化（`k × std(y)`），否则 0.06 换到"分钟/循环"直接失效
+-
+-### 下一步
+-
+-1. 等 Q16 答复确定主线（推荐 B → A → C）
+-2. 数据到手先跑侦察脚本，不要先建模
+-3. 指标层加 `metric` 选择器（`macro_f1 / mae / rmse / nasa`），**全部转成越高越好**
+-
+----
+-
+-## 2026-11-20（第二段）：镜像断网跑通 + 五件套 5/5
+-
+-### 完成
+-
+-- **Docker 三件套**：`Dockerfile` / `requirements.txt` / `.dockerignore` + `scripts/entrypoint.py`
+-  （`docker run <image>` 零参数、零网络、恒 exit 0；镜像自带 36 维特征缓存，不挂盘也能跑）
+-  - `docker pull python:3.11-slim` **直连成功** → registry mirrors 不必配，原来的"拉不到镜像"阻塞解除
+-  - 镜像 `zhixun-rsi:0.1`：Python 3.11.18 + numpy/sklearn/scipy/pyyaml，565 MB；**不装 swanlab**
+-  - `docker run --rm --network none` 断网 dry-run：static MAE 0.4364 / trigger 0.1292，
+-    7 次重训、6 次晋升、0 回滚，退出码 0；带 `-v` 时 `run.log`/`summary.json`/各 run 目录齐全
+-- **受控 RSI 五件套 5/5**：
+-  - `src/policy/whitelist.py`（白名单 + 参数范围 + 外部提案解析，永不抛异常）
+-  - `src/policy/bounds.py`（幅度上限：≤ 上版 2×，最多改 2 个参数）
+-  - `src/policy/budget.py`（次数上限：终身 12 次 + 窗口 8 次/40 步）
+-  - `src/harness/killswitch.py`（env / 配置 / STOP 文件 / 超时 / 连续异常，触发即锁死）
+-  - `src/utils/audit.py`（`<run>/audit.jsonl`，append-only、逐行 flush）
+-  - 统一闸口 `src/harness/guard.py`：kill-switch → 白名单 → 预算 → 幅度上限 → approve
+-- **故障注入验收** `scripts/check_guard.py`：9 类（F1 白名单 / F2 坏 JSON / F3 次数 / F4 幅度 /
+-  F5 kill-switch 多来源 / F6 断流 / F7 连续异常自动锁死 / F8 数据缺失 / 健康跑到尾）全部 PASS
+-- **回归未变**：4 轴承 × 3 策略 × 2 seed 聚合 static −0.4070 / periodic −0.1451 / trigger −0.1060；
+-  单流 `xjtu_3_4` trigger：MAE 0.1292、重训 7、晋升 6、回滚 0
+-- ⚠️ 成本口径提醒：`unit_gain_cost` 是 wall-clock 计时，**机器负载能改变 ±15%**
+-  （同一矩阵两次跑：periodic 114.1 → 121.9，trigger 174.7 → 178.6；MAE 不动）。
+-  结论"periodic 更便宜"不变，但最终报告里的成本数字要**空载机器复测**后再定稿。
+-- `ExternalPolicy`（`policy.type: external`）：LLM/外部 proposer 的接入位，
+-  输出必过 `parse_proposal` + Gatekeeper，proposer 抛异常也只是 `none`
+-
+-### 新增产物字段
+-
+-- `<run>/audit.jsonl`、`<run>/guard.json`；`summary.json` 增 `guard` / `audit` / `degraded_steps`
+-- `configs/base.yaml` policy 增：`max_retrains_per_window: 8`、`max_consecutive_failures: 3`、
+-  `max_wall_seconds: 0`、`amplitude_factor: 2.0`
+-
+-### 未完成
+-
+-- SwanLab 云端项目 / `swanlab login`、`trio login` 仍未做（**必须本人**）
+-- 报名状态、官方数据包、企业赛提交细节仍未确认
+-- 跨工况域偏移流、HPO 第二层、Decision Model（企业赛）未开始
+-- `reports/系统说明.md`（提交三件套之一）还没写
+-
+-### 下一步
+-
+-1. 本人：报名状态 + `swanlab login` + `trio login`（三条外部依赖）
+-2. 写 `reports/系统说明.md`（怎么跑、输入输出、资源占用、五件套怎么演示）
+-3. 跨工况域偏移流（35Hz 训 → 40Hz 部署）：区分"磨损"与"工况变了"
+-4. `docker save` 出 `.tar` 并复核体积
+-
+-### 阻塞
+-
+-- 登录类/报名类（等本人）；官方评测平台未开放（Q8）
+-
+----
+-
+-## 2026-11-20：新手可操作性补齐（操作手册 + 三个教学工具）
+-
+-### 完成
+-
+-- `docs/07_操作手册.md`：harness 要不要训练（三种训练拆分）、数据五步流水线、
+-  本地自测三步、结果解读与排障表、动作白名单（none/retrain/finetune/swap_model/reweight
+-  + 自动保护 rollback/kill-switch）、五件套自查表
+-- `scripts/inspect_data.py`：原始 CSV → 36 特征 → npz → 流切分 → 误差增长，一条命令看完整条链
+-- `scripts/report_run.py`：把 `summary.json`/`metrics.json` 翻成人话（去掉会误导的
+-  unit_gain_cost_vs_ref，改为指向 matrix.md 与静态基线对比）
+-- `scripts/export_view.py`：导出 Excel 可读 CSV（`view/数据_*.csv`、`view/对比_*.csv`）
+-- Docker Desktop 29.9.3 已装并运行；**镜像加速仍未配置**，`Dockerfile`/`requirements.txt` 未写
+-- 按官方 README 装好 PyTRIO 体系：`pytrio` 0.2.9（可 import）、`trio` CLI、agent skill
+-  `pytrio-skill` v0.2.4（全局，`~/.agents/skills`）。**未登录**（需本人 `trio login`），校赛无额度不训练
+-- 记录到 `docs/07` 3.3b（环境）与 5.6（把动作选择做成 Decision Model 的思路）
+-
+-### 未完成
+-
+-- Docker `--network none` dry-run（阻塞于镜像加速配置）
+-- SwanLab 云端项目 `rsi-zhixun` 仍未创建
+-- 五件套：白名单枚举已有，校验器/kill-switch/审计 JSONL 仍缺
+-- `trio login` 未做（阻塞于本人操作）；PyTRIO 支持模型清单待登录后用 `get_supported_models()` 核对
+-  （规则 PDF 写 Qwen3.8-27B，skill 案例用 Qwen3.5-4B，仍未消解）
+-
+-### 下一步
+-
+-1. `swanlab login` → 重跑一条流 → 云端可见
+-2. 配 `registry-mirrors` → `docker pull python:3.11-slim`
+-3. 写 Dockerfile 三件套 → 断网 run 通
+-4. 审计日志 + kill-switch 最小实现
+-
+-### 阻塞
+-
+-- 官方评测平台未开放（Q8）；报名状态仍未核实
+-
+----
+-
+-## 2026-11-11（当天第二段）：从零代码到真实数据闭环
+-
+-### 完成
+-
+-- 搭建完整可运行骨架：`src/`（数据/模型/漂移监控/策略/Harness 循环/成本账本/SwanLab 封装）、
+-  `configs/`（6 条合成流 + 4 条真实流）、`scripts/`（smoke / stream / matrix / 特征缓存）
+-- 合成漂移垂直切片已通过：static 在 concept/gradual 上掉到 0.62/0.68，
+-  trigger/periodic 恢复 +0.13~0.22，且 trigger 比 periodic 便宜约 33%
+-- 接入 **XJTU-SY 轴承全寿命数据集**（公开代理数据，非官方包）：
+-  - `scripts/build_xjtu_cache.py` 抽取 36 维时/频特征，9,216 个快照，8 进程 131 秒
+-  - 新增回归任务通路（HistGradientBoostingRegressor，perf = −MAE）
+-  - 4 条真实流（Bearing3_1/3_2/3_4/2_3）× 3 策略 × 2 seed 跑通
+-- 修复真实数据暴露的三个设计缺陷：
+-  1. PSI 只用单步 batch（6 行）计算 → 恒为 0，全部误判 concept；改为用最近 40 步窗口
+-  2. 晋升门控拿"不同分布上的验证分"比较 → 挑战者永远输；改为冠军/挑战者在**同一 holdout** 上比较
+-  3. 分组聚合把一步压成一行 → 训练历史不足；改为保留快照级样本、同一步多样本
+-- 真实数据结果：静态 MAE 0.34–0.45，periodic 0.11–0.20，trigger 0.09–0.12；
+-  单位增益成本 periodic 92 vs trigger 143 → **周期重训更划算**（详见 `docs/05`）
+-
+-### 未完成
+-
+-- 队伍报名状态仍未知；官方数据包仍未开放
+-- SwanLab 项目 `rsi-zhixun` 仍未在云端创建（本地 `swanlog/` 已验证）
+-- 跨工况域偏移流、超参数第二层、LLM Harness 均未开始
+-
+-### 下一步
+-
+-1. 跨工况流：35Hz/12kN 训练 → 40Hz/10kN 部署
+-2. 策略层自进化（超参搜索）接入同一门控与成本账本
+-3. 登录 SwanLab 后把这批 run 重放到云端，作"完整记录"演练
+-4. 官方数据包开放后优先重跑 `docs/05` 第 4 节
+-
+-### 阻塞
+-
+-- 报名状态、官方数据包与评测平台（均等外部）
+-
+----
+-
+-## 2026-11-11（项目第 0 天）
+-
+-### 完成
+-
+-- 读完 `赛题规则.pdf` 全文，产出 `docs/00_赛题规则解读.md`
+-- 核实官方赛程，发现 `plan0.md` 时间轴整体晚约 3 周，产出 `docs/01` 与 `plan1.md`
+-- 建立工作区文档体系（README / AGENTS / docs 五篇 / plan1）
+-- 确认 SwanLab 团队空间存在：`@xiangxinnidexin`（"相信你的心"，中国人民大学，北京）
+-
+-### 未完成
+-
+-- 队伍报名状态未知（**最紧急**）
+-- 官方数据包未下载
+-- SwanLab 项目未创建、smoke run 未跑
+-- 答疑群未进、问题未发
+-- 代码为零
+-
+-### 新增问题
+-
+-- Q1–Q15 全部登记在 `docs/open_questions.md`，均待确认
+-
+-### 下一步
+-
+-1. 今天：确认报名 + 进群发问 + 建 SwanLab 项目
+-2. 11-12：数据包 + schema + smoke
+-3. 11-18：垂直切片（基线 + 流评测 + 成本 + 4 条合成流）
+-
+-### 阻塞
+-
+-- 报名状态（等教务处/组委会）
+-- 官方数据包与评测平台（等平台开放）
+-
+----
+-
+-## 决策日志
+-
+-| 日期 | 决策 | 理由 | 证据 |
+-|---|---|---|---|
+-| 2026-11-11 | 以 `plan1.md` 取代 `plan0.md` 作为执行计划 | plan0 的日期与官方赛程冲突，且缺少资格确认与分工 | `docs/01`、`docs/02` |
+-| 2026-11-11 | 保留 `plan0.md` 不修改 | 留痕，便于复盘；避免历史信息丢失 | — |
+-| 2026-11-11 | 一人一个 SwanLab 账号，共用一个团队项目 | 规则禁止账号转借；run 需可追溯到人 | `docs/00` 第十节 |
+-| 2026-11-11 | 官方包未开放期间用 XJTU-SY 作代理数据 | 全寿命退化天然对应 RUL 预测；结果标 `proxy`，不冒充官方成绩 | `data/VERSION.md` |
+-| 2026-11-11 | 任务默认做 RUL 回归，分类作为可切换分支 | 官方赛题写"剩余寿命预测"；回归与官方口径更接近 | `docs/05` 第 2 节 |
+-| 2026-11-11 | 晋升必须在**同一 holdout** 上比较冠军与挑战者 | 跨分布比较会让挑战者永远输，实测真实数据 0 次晋升 | `src/harness/loop.py` |
+-| 2026-11-20 | Harness 本身不"训练"：校赛阶段用规则+校验，PyTRIO 微调留到企业赛 | 校赛无 PyTRIO 额度；规则版可解释、可离线、成本为 0 | `docs/07` 第 1 节 |
+-| 2026-11-20 | 次数上限做成两层：终身 ≤12 + 窗口 ≤8/40 步 | 主限速仍是 `retrain_cooldown`，窗口上限只防突刺；设成 4/40 会误伤正常触发式（实测 MAE 0.129→0.173，多出 1 次回滚） | `scripts/check_guard.py` F3、`experiments/matrix-*` |
+-| 2026-11-20 | 未实现的动作（finetune/swap_model/reweight）在白名单里"声明但不放行" | 防止 LLM 提名后被静默当 retrain 执行；没有执行器就不许选 | `src/harness/guard.py`、F1 |
+-| 2026-11-20 | 镜像不装 swanlab，入口固定 `RSI_SWAN_MODE=disabled` | 断网是硬约束，装了也连不上，反而制造出网尝试；云端记录由宿主机跑的实验负责 | `Dockerfile`、`scripts/entrypoint.py` |
+-| 2026-11-20 | 镜像把 36 维特征缓存烤进去（1.3 MB），不要求挂盘 | 评测机挂载方式未知（Q8 未确认），自包含最稳；原始 16 GB 数据集不进镜像 | `Dockerfile`、`.dockerignore` |
+-| 2026-11-23 | v2 把“连续 2 轮无收益就停手”放在重训之前 | v1 报告显示 C 第 4–10 轮、B 第 3–10 轮候选全被拒却仍花 4/5 epoch；停手不改变已选模型，只省算力 | `reports/v2_replay_v1.md`、v1 trial report |
+-| 2026-11-23 | 回归 gap 改为相对 RMSE，`best` 不再用 0 初始化 | 绝对值 600/50 会把任何阈值冲垮，导致每轮无条件重训 | `src/harness/round_controller.py`、单测 |
+-| 2026-11-23 | 模型裁决只允许“收窄/保持/回滚”，不允许放大预算 | 4B 基础模型可能给出不可靠建议；规则保底、模型只能减少风险，符合“受控 RSI” | `apply_verdict()`、`docs/04` §4.6 |
+-| 2026-11-23 | 平台入口接入 Gatekeeper（白名单/幅度/次数/kill-switch） | v1 平台路径绕过了本地闸门；专家分里的“安全/受控实验”需要证据 | `harness/contest_submission.py`、`scripts/check_guard.py` |
+-
+-## 版本记录维护
+-
+-每次创建提交版本时，在[版本演进记录](版本演进记录.md)追加方案、改进手段和理由；运行结束后在同一节回填结果与取舍。
++> 2026-11-25 v16 更新：修复队友交付包混合旧模块问题，沿用完整 v15 算法；92 项单测通过，A/B/C 公开推理哈希一致。新增运行模块清单、镜像构建预检、导出后解压验收。未做容器/SDK/平台验收。详见 [v16比较与交付](../reports/v16_比较与交付.md)。以下为历史记录。
++
++> 2026-11-25 更新：v15 本地候选已交付。仅调整 C 的后期预算/有界探针，保留 v14 校准与门禁；85 项测试通过，固定公开 C 十轮 NASA -4.43%、RMSE +0.13%。未做平台/SDK/容器验收。详见 [v15交付](../reports/v15_交付_2026-11-25.md)。以下为历史记录。
++
++# 项目进度快照
++
++<!-- latest-trials -->
++A/B/C 按最新交接与正式评测步骤各占三分之一；已测版本继续以 v5 作为整体参考，v6 仅作对照。v7.1 为本地工程修复候选，尚无平台成绩、未启动试运行。详见 [v7.1交付](../reports/v7.1_交付_2026-11-24.md)。
++<!-- /latest-trials -->
++
++> 每次会话/每周例会结束更新。最新的在最上面。
++> 格式固定，方便 agent 与人快速接手。
++
++## 2026-11-24：v14 融合 `v9.2` 与 `v13` 优点（`res_mlp_v2` + 分组观测 + 完整审计）
++
++- **融合目标（分支 `v14`，发布默认 `RELEASE=0.14`）**：以通过全量单测与线上复盘修复的 `v9.2` 为完整底座，吸收 `v13` 的有效创新并修补 `v13` 的边界瑕疵与工程漏项：
++  1. `vendor/contest_baselines/c_calibration.py`：新增 `res_mlp_v2` 模式，在 `v9.2` 双向残差 MLP（`[-120, +42]`、`over_boost=1.15`、`_best_shift_asym`）基础上，融合 `v13` 的**分工况标准化 `parent_moments`**（全局 + 分工况双尺度 `p_norm`）与**端点线性修正 `_fit_endpoint`**（收紧至 `rmse_tol=0.002`、`grid=[-6..8]`），并修复 `v13` 两处边界问题：`_fit_endpoint` 评估候选时保持 `np.maximum(0.0, ...)` 非负一致、推理时 `endpoint` 仅作用于已知工况（`known`）以保证未知工况完全回退父模型；保留 `v8`/`spline_v2`/`res_mlp_v1` 向后兼容。
++  2. `vendor/contest_baselines/data.py` & `harness/contest_submission.py`：合入 `v13` 的 C-MAPSS `FD001..FD004` 分组提取（`meta.source_subset` / ID 正则）并在 `rnd.dataset_key in ("B", "C")` 传入观测性 `validation_groups`；补齐 `selection_audit` 对 `0.9.1`/`0.9.2`/`0.14` 的输出；同步保留 `v9.2` 的 3-epoch 新阶段预算修复、C 组 `nasa_bonus` 门控与中间 epoch 校准节流。
++  3. `harness.Dockerfile`：默认 `ARG RSI_RELEASE=0.14`，与代码默认严格对齐。
++- **本地验证**：
++  - 77 项单元测试与 5 核心模块 `py_compile` 全通过；
++  - 同父检查点公开 C 组消融（113,089 训练行 / 496 台发动机，23,049 验证行）：VAL RMSE `47.010`、NASA `1.027e9`（`logN=20.750`，较 `v9.2` 的 `1.277e9` 降 **19.6%**，较 `v13` 完整激活的 `1.589e9` 降 **35.4%**，较 `v8/v9` 的 `3.857e9` 降 **73.4%**）；3 折按发动机 OOF RMSE `52.326`、`logN=28.650`（较 `v9.2` 再降 11.2%，较 `v13` 降 61.6%）；
++  - 真实公开 A/B/C 3 轮闭环：A/B 零回归（检查点 SHA256 与指标完全一致）；C 组 3 轮后 VAL RMSE `51.550 → 46.929`、MAE `36.820 → 33.592`、NASA `5.040e9 → 9.830e8`（`logN 22.341 → 20.706`，**-80.5%**；较 `v9.2` 3 轮后的 `1.309e9` 再降 **24.9%**），3 轮总耗时 `7.71s`，批量 vs 逐行最大差 `5.68e-14`。
++
++## 2026-11-24：v9.2 基于网页评测报告的 C 组全面修正（`res_mlp_v1` + 控制器 + CPU 节流）
++
++- **线上复盘根因（对比 8 次平台试运行，重点对照 Run 0 `0.9` / Run 1 `0.7.2` / Run 3）**：
++  1. `0.9` 在 C 隐藏集 NASA 反升至 `115.92B`（`0.7.2` 为 `79.52B`，Run 3 为 `67.41B`），主因是 `v8/v9` 校准器给 `target < 0` 加权 `1.35` 并叠加 `[-3.5, +0.5]` 负向平移，而真实 C 组 NASA 97%+ 由极端**低估尾部**主导，单向压低适得其反；
++  2. `0.9` 的 `c_stage_probe` 将 `C-stage-02/03/04`（R4/R7/R9）新阶段预算砍成 `1 epoch`，导致 R9 虽已实现 RMSE（`50.468→50.443`）与 `nasa_log1p`（`23.192→23.066`）双降仍因未过门槛被拒，全程停留在 R3 旧检查点；
++  3. `official_round.py` 每 epoch 重复全量拟合校准器，使 `0.9` 线上校准 CPU 达训练本身的 ~6.5 倍。
++- **本轮修改方向（分支 `v9.2`，发布默认 `RELEASE=0.9.2`）**：
++  1. `vendor/contest_baselines/c_calibration.py`：保留 `res_mlp_v1` 双向工况残差 MLP（`[-120, +42]`）与 `spline_v2` 备选，按 3 折 OOF 消融将 `over_boost` 从 `1.65` 回调至 `1.15`（避免隐藏集低估雪崩，同时保留温和防高估），并将 `_best_shift_asym` 搜索网格从 49 点精简至 25 点；
++  2. `src/harness/round_controller.py`：`NEW_STAGE_EPOCHS["C"]` 与 `c_stage_probe` 恢复至 `3 epochs`（对齐 `0.7.2` 在 R4/R9 晋升的表现）；C 组 `nasa_bonus` 放宽为 `gain >= 0.0 and delta <= -0.08`（RMSE 不退步且 NASA 降幅 ≥7.7% 即允许晋升）；
++  3. `src/models/official_round.py`：非 `v8` 校准模式在多 epoch 续训中跳过未校准验证 RMSE 明显退化（`> 1.005×best`）的中间 epoch 重拟合，降低线上 CPU 开销，同时保持 `v8` 路径字节级不变。
++- **本地验证**：76 项单元测试与 4 模块 `py_compile` 全通过；真实公开 C 组 3 轮闭环（`verify_upgraded_repo.py`）：VAL RMSE `50.325 → 46.976`（-6.7%）、MAE `36.302 → 33.653`（-7.3%）、NASA `2.806e9 → 1.267e9`（**-54.8%**，`logN 21.755 → 20.960`）；3 折按发动机 OOF RMSE `54.087 → 52.080`、`logN 31.009 → 28.863`（**-88.3%**）；A/B 零回归（检查点 SHA256 与指标完全一致）；批量 vs 逐行最大差 `8.5e-14`。尚待平台试运行验收隐藏集表现。
++
++## 0.9 本地候选：三题同轮约束选模
++
++- 保留 v8 的优化器、请求预算和输出策略；A 允许持平，B/C 先检查同轮可晋升性再选快照。增加 CPU 分项计量、父子指标、C 尾部复核和无需平台的配对验收工具。证据和使用方法见[候选说明](../reports/版本方案/同轮约束选模.md)。
++- 仅完成本地机制验证；没有运行官方公开包完整轨迹或隐藏试运行，不据此修改正式推荐。
++
++## v8 源码候选：预算约束下的更新与选模
++
++- 基于 `16f1620` 实现回执解析、C 分工况风险偏移、B/C 晋升门控和可选权重平滑。约束和冲突取舍见 [v8 版本说明](../reports/版本方案/v8.md)。
++- 本地 Python 3.12 + NumPy：原 44 项与新增 16 项测试全部通过，6 个指定模块通过 `py_compile`。未运行官方 SDK、构建赛事镜像或消耗平台次数；尚无平台成绩，不替代 v5。
++- 下一步：固定公开阶段做单模块消融，分别核对 A/B/C、CPU、token 与真实模型回执。
++
++## 2026-11-24：v7.1 本地发布安全修复
++
++- 采用新源码包基线，未合入旧cap130/绝对NASA门禁。A沿用v7预算与容差；B/C无固定上限，C工况校准默认启用。
++- 修复v7依赖环境开关、Docker却默认0.6的陷阱。预测不随RSI_RELEASE变化；显式校准开关0可关闭新拟合。
++- 模型失败/空响应/坏结构降级规则，记录回执状态、finish_reason、字段名和错误类型，不记录异常消息、不伪造成功调用。
++- schema3持久化真实行数历史；新增NASA稳定对数求和与B逐轴承观测，不改变选模。早停报告区分保存快照和执行消耗。
++- 44项单测、8模块py_compile通过。真实公开A/B/C各3轮新旧对照：检查点/批量预测哈希、晋升序列一致；逐条与批量最大差<1e-12。此为本地替身宿主，不是SDK验收。
++- 旧check_guard未通过：输入包缺src.data，F6/F7/healthy报ModuleNotFoundError。没有补造加载器或改断言；.gitignore仅忽略根data，避免忽略src/data，npz权重仍忽略。
++- 本机无SDK和Docker daemon；没有远端、平台或SwanLab云端写入。见 `reports/v7.1_交付_2026-11-24.md` 和 `reports/数学分析更新_2026-11-24.md`。
++
++---
++
++## 2026-11-23：P0 源码交付与数学不可行性诊断（并行分支）
++
++- 本地 `fix/cap-nasa-gate`：C24 特征回归按请求 `min(0.9*max(value,0),130)`；服务输出 NASA>1e6 或 >父分 1.2 倍拒绝晋升，另报原始 NASA；schema3 增加 rows/rows_history/data_grew 并兼容 n_train。
++- 9 项 LLM 兼容、5 项预测入口、33 项控制器/安全测试全通过，入口 `py_compile` 退出 0；没有新增依赖。真实续训合成接线验证父模型保留、审计、save_state 和 finish，不冒充 SDK 全流程。
++- 附件 3 显示 v3 已完成：C MAE 43.787114 / RMSE 62.881078 / NASA 2.440040142e12；A 仍约 0.8674。仓库下面“v3 正在跑”为历史状态。
++- 公开 C 基线验证 23,049 行、最大真值 434、9,163 行 >130；原始 NASA 5.8234e9，cap145 后 7.3670e10，指定新策略后 2.3263e11。cap130 与 NASA 1e6 门禁不可行，候选将被冻结；**没有达到平台验收，不建议直接消耗试运行**。
++- 附件 2/3 模型裁决各 30/30 unavailable，有效 LLM 覆盖率 0；不能把 A 从 0.8735 降到 0.8674 归因于 LLM。保持 A 代码与 P1 策略不变，后续先做固定预算消融。
++- 附件 2 配置的 0 epoch 实为 B 第 4/6/7 轮、C 第 5/6/8/10 轮，共 7/30；“未训练/保留父模型”的页面文案还包含已训练但未晋升情形。
++- 阻塞：历史镜像 OCI digest/检查点哈希不可得；新检出缺 SDK，Docker daemon 未运行，尚未做 SDK/容器验收。未推送 PR、上传、试运行或补录 SwanLab。
++- 详细交付、风险回退与 PR 描述草案：`reports/P0_交付_2026-11-23.md`；数学专项：`reports/数学建模与优化报告.md`。
++  **这两个文件在并行分支 `fix/cap-nasa-gate`，未合并到本仓库**，引用时注意。
++
++---
++
++## 2026-11-24（00:40）：v4/v5 本地审计完成，平台版本已建、未试运行
++
++### 结论
++
++- **A/B 冻结**：A 的 -0.69% 暂按可接受处理，不做 A 预算消融；B 的 251.70 不动。
++- **v4**（无上限 + 三项工程修复）与 **v5**（v4 + C 工况校准）都已完成本地全链路验证，
++  平台版本 4/5 均 `valid`；**v2 仍是正式候选**。
++- 没有消耗新的试运行：trial 已用 3/10，正式评测 0/3。
++
++### C 公开验证（23,049 条，同阶段第 3 轮模型）
++
++| 方案 | MAE | RMSE | NASA |
++|---|---:|---:|---:|
++| v4 无上限 | 37.856 | 51.692 | 4.321×10⁹ |
++| **v5 校准 ±10** | **36.536** | **50.049** | **2.378×10⁹** |
++| 变化 | -3.5% | **-3.18%** | **-44.97%** |
++
++- 四个 FD 子集 RMSE 均下降；NASA 在 FD001/FD004 下降、FD002/FD003 略升；
++- 训练/验证发动机无交集；校准只用公开训练集、推理只用 NumPy；
++- 全量 113,089 行、3 轮 SDK、23,049 条逐条 `predict()` 已验证；隐藏收益未验证。
++
++### 工程修复
++
++| 问题 | 修复 | 验证 |
++|---|---|---|
++| 特征路径重复编码 | `lru_cache(2048)` + tuple path | 六个文件读取 CPU 23.13→7.56 s（-67.3%），本机复测 23.54→7.94（-66.3%） |
++| 历史增益写反 | 用每轮 `configuration.gain` | v3 C 第 1 轮由 -10.701% 修正为 +0.9805%；60 条记录核对 |
++| 连续失败不熔断 | 恢复 `kill_state`，成功/失败计数 | 3 次失败后第 4/5 轮零预算；单测 30 项 |
++
++### 平台版本
++
++| 版本 | 镜像 | submission id | 状态 |
++|---|---|---|---|
++| v4 | `zhixun-rsi-harness:0.4`，archive `47311235…` | `d4ba36296650c173927634d0ab38f105` | valid |
++| v5 | `zhixun-rsi-harness:0.5`，archive `938ccaab…` | `5a45bc60cf3f4ea34b35a3fa1f99bd4d` | valid |
++| v2 | 正式候选 | `8636a3dcbc…` | valid，已有平台成绩 |
++
++- 容器：`0.4` A 2 轮、`0.5` C 2 轮断网彩排 exit 0；`describe` 均通过；
++- 单测 30 项、`check_guard.py` 9/9 PASS；
++- 平台文档 `系统说明.md` 已更新到 v4/v5 状态。
++
++### 下一步
++
++1. **先试运行 v4**（1 次）：验证撤销 145 后 C 回到 v2 水平，A/B 不变；
++2. **再试运行 v5**（1 次）：只验证 C 校准，比较 MAE/RMSE/NASA/CPU；
++3. 若 v5 平台退化，保留 v4/v2；若改善，再把 v5 选为正式候选；
++4. 剩余 7 次试运行留给重复/最终确认，正式评测 3 次不动。
++
++---
++
++## 2026-11-23（23:40）：v3 完成，C 的 145 上限被实测证伪
++
++### 平台结果（run `27143ad15abd6f1a4daf998200625545`，submission v3，镜像 0.3）
++
++| 数据集 | v2 | v3 | 变化 |
++|---|---:|---:|---:|
++| A macro-F1 | 0.8674 | 0.8674 | 0（A/B 与 v2 逐位相同） |
++| B MAE / RMSE | 251.70 / 352.08 | 251.70 / 352.08 | 0 |
++| C MAE（循环） | 41.12 | **43.79** | +6.5% |
++| C RMSE | 56.38 | **62.88** | +11.5% |
++| C NASA | 8.85×10¹⁰ | **2.44×10¹²** | **27.6×** |
++| 总 epoch | 66 | 66 | 0 |
++| 墙钟 / CPU | 3,927 s / 3,044 s | 3,730 s / 3,075 s | -4.8% / +1.0% |
++
++### 结论
++
++- v3 只改了 C 的 `min(value,145)`，A/B 逐位相同，所以 C 的变差可以归因到上限；
++- C 的 RUL 真值最大 **542**，公开验证集 **33%** 的样本 >145；上限把真实高 RUL 压成低估，
++  NASA 对低估也是 `exp(-d/13)-1`，所以从 8.85×10¹⁰ 变成 2.44×10¹²；
++- **145 这个参数被实测证伪，不是“再调大一点”的问题**：v4 直接移除上限；
++- 资源没有明显收益（epoch 相同，CPU +1%），说明上限只改变预测，不改变训练。
++
++### 下一步（冻结 A/B，C 先无上限、再校准）
++
++1. **v4：只移除 C 的 145 上限 + 三项工程修复**，A/B 预算保持 v2；
++   跑 1 次试运行，预期 A 0.8674、B 251.70、C 回到 41.12/8.85×10¹⁰。
++2. **v5：在 v4 上只加 C 工况校准**（±10），A/B 不动；
++   跑 1 次，比较 C 的 MAE/RMSE/NASA 和 CPU；隐藏收益未验证，不得直接替换 v2。
++3. **A/B 冻结**：不再做 A 预算消融，不用平台次数追 0.006；B 的 251.70 不动。
++4. v2 继续作为已有平台成绩的正式候选；v4/v5 只有平台验证后才替换。
++5. 剩余 7 次试运行留给重复/最终确认；正式评测 3 次不动。
++
++### 新增事实
++
++- **Q23**：C 的 RUL 真值最大 542（公开训练集），145 上限会切断 33% 的真实高 RUL；
++  任何“尾部上限”必须 ≥ 训练集 99.5 分位（419）或直接去掉。
++
++---
++
++## 2026-11-23（22:30）：v2 试运行完成，B 指标减半、资源减半
++
++### 平台结果（run `2b638d5aa090722ebc32e1c3f577e000`，submission v2）
++
++| 数据集 | v1 | v2 | 变化 |
++|---|---:|---:|---:|
++| A macro-F1 | 0.8735 | 0.8674 | **-0.0060（-0.69%）** |
++| A accuracy | 0.8795 | 0.8729 | -0.0065 |
++| B MAE（分钟） | 506.67 | **251.70** | **-50.3%** |
++| B RMSE | 708.58 | **352.08** | **-50.3%** |
++| C MAE / RMSE | 41.12 / 56.38 | 41.12 / 56.38 | 0（同一模型） |
++| C NASA | 8.85×10¹⁰ | 8.85×10¹⁰ | 0（0.2 镜像无上限） |
++| 总 epoch | 119 | **66** | -44.5% |
++| CPU 秒 | 3,229 | 3,044 | -5.7% |
++| 墙钟秒 | 8,160 | 3,927 | **-52.0%** |
++| training_seconds | 4,471 | 2,016 | **-54.9%** |
++| total tokens | 22,366 | 32,087 | +43% |
++
++### 完成
++
++- v2 三题各 10 轮全部完成，`training_complete=true`；
++- **B 收益最大**：MAE/RMSE 减半；v2 在 B 第 2/3/8/9 轮拿到正收益，最终选中第 9 轮；
++- **A 小幅回落**：总 epoch 28→23，部分新阶段只给 2 epoch；A 的新阶段预算需要调回 3；
++- **C 完全没变**：v2 最终仍选第 3 轮模型，停手只省了 23 epoch，没改变产物；
++- 停手规则生效：B 第 4/6/7 轮、C 第 5/6/8/10 轮 `epochs=0`（共 7/30 轮）；
++- 回放预测省 56 epoch，实际省 53 epoch，基本吻合；
++- **模型裁决仍全是 `unavailable`**：`content`/`reasoning_content` 都没有文本，reason 如实写
++  “无文本，按规则执行”；没有伪造模型判断，但“自主决策”的展示素材仍不足。
++
++### 进行中
++
++- **v3 试运行**（run `27143ad15abd6f1a4daf998200625545`，submission v3，镜像 0.3）
++  已启动，A/B 完成、C 训练中；它带 C 题 145 上限，重点看 NASA 是否下降。
++
++### 下一步
++
++1. 等 v3 报告：重点看 C NASA、B 是否守住 251.70、A 是否回到 0.87 以上；
++2. 若 A 仍低于 v1，把 A 的新阶段预算从 2 调回 3（只动 A）；
++3. 用 v2 的“B 减半 + 资源减半”做技术报告/视频主线，C 等 v3；
++4. 正式评测前再确认版本与记录链接的对应关系。
++
++### 决策日志
++
++| 日期 | 决策 | 理由 | 证据 |
++|---|---|---|---|
++| 2026-11-23 | 保留 v2 的停手规则，不回退到“每轮都训” | v2 实测省 53 epoch、B MAE 减半；C 没变但也没变差 | `reports/trial_runs.md`、v2 report |
++| 2026-11-23 | A 的新阶段预算待 v3 后再调，不立刻改 | v3 已经在跑，先看同一套预算在 0.3 上的 A 结果，避免同时改两个变量 | v3 run `27143ad1…` |
++
++---
++
++## 2026-11-23：v1 试运行复盘 + v2 控制器与第二次提交准备
++
++### 完成
++
++- **读回 v1 试运行报告**（`_state/trial_report_completed.json`）：A/B/C 各 10 轮全部 `finish`
++  - A：macro-F1 **0.8735** / accuracy 0.8795，CPU 993 s，wall 2662 s
++  - B：MAE **506.67** 分钟 / RMSE 708.58，CPU 368 s，wall 1968 s
++  - C：MAE **41.12** 循环 / RMSE 56.38，CPU 1868 s，wall 3530 s
++  - 三个待查点：`/data` 按阶段变化（A 8 段 / B 3 段 / C 4 段）、父检查点路径稳定、10 轮都完成
++- **定位 v1 四个缺陷**：回归 `best_val` 初值 0；Qwen 回复在 `reasoning_content` 而只读 `content`；
++  C 第 4–10 轮 / B 第 3–10 轮候选被拒仍重训；漂移参考不跨轮、预测 JS 恒 0
++- **v2 轮次控制器** `src/harness/round_controller.py`：跨轮参考画像、历史回读、模型裁决可读/可收窄、
++  相对 gap、停手/探针、相对验收阈值；`harness/contest_submission.py` 接入 Gatekeeper 五件套
++- **状态 schema 2**：`profile/baseline_profile/pred_profile`、`best/last/last_gain/stalled`、
++  `decisions[≤10]`、`bounds/budget_steps/audit_events`
++- **测试**：`tests/test_round_controller.py` 23 项全 PASS
++- **彩排**：进程内 A 10 轮、B 3 轮、C 3 轮（含回归路径）、C 全量首轮 45k 行
++  （RMSE 52.87→52.00，+1.65%，采纳）；容器内 `--network none` A 3 轮全 exit 0
++- **回放**：v1 报告 119 epoch → v2 63 epoch（-47%），估计少 1292 CPU 秒（-40%）；
++  A 不省（更新都有收益），B/C 主要省在“被拒还重训”的轮次
++- **v2 镜像**：`zhixun-rsi-harness:0.3`（285 MB，tar 64 MB）已构建、断网 describe 通过；
++  `dist/zhixun-rsi-harness-0.3.tar` 已导出
++- **平台动作**：镜像已上传：v2 初版 archive `88f5afb…`、**v3 最终版** archive
++  `880b0fd503abcc04b0d49433c15eeafb`（均 ready）；提交版本 v2（`8636a3d…`）与
++  **v3 最终版**（`b318577fbc02cdfeb8504ac94c707c10`）均 `status=valid`。
++  v3 = 0.3 镜像 + 含 C 题 145 上限的文档；两个版本都未消耗试运行次数。
++  首次校验曾返回 `模型服务暂不可用`，退避约 2 分钟后重试成功。
++- **材料**：`reports/技术报告_v2.md`、`reports/来源声明.md`、`docs/演示视频分镜.md`、
++  `reports/v2_replay_v1.{md,json}`、`reports/trial_runs.md`、`reports/系统说明.md` 已更新
++
++### 待办（第二次提交）
++
++1. ~~上传 `dist/zhixun-rsi-harness-0.3.tar`~~ ✅（archive `880b0fd…`，ready）
++2. ~~新建提交版本~~ ✅（v2 `8636a3d…` 中间版；**v3 `b318577…` 最终版**，均 valid）
++3. **选 1 次试运行**（trial 已用 1/10；上传/建版本/校验都不扣次数）→ 看 A/B/C 的
++   `decision`、C 是否停止白训、模型裁决是否仍有文本
++4. 录演示视频（按 `docs/演示视频分镜.md`，≤5 分钟）
++5. 确认试运行报告后再决定「选为正式版本 + 开始正式评测」
++   （平台 `#teams` 显示 `formal_limit=3`，与交接单写的 2 次不一致，以平台为准）
++
++### 新增问题 / 事实修正
++
++- **Q21**：C 的 NASA 分数在 v1 报告中为 8.85e10，指数惩罚对严重高估极敏感；
++  v2 已对 24 特征回归输出加 145 上限，效果待下一次试运行验证。
++- **Q22**：v2 首次校验返回 `模型服务暂不可用，请稍后重试`；退避约 2 分钟后重试成功，
++  状态变 `valid`。短时间重复请求会 409 `校验请求过于频繁`，不要连续点。
++- 平台 `formal_limit=3`（`formal_remaining=3`），不是交接单里写的 2；试运行 `trial_used=1`。
++- 第一次试运行（`41d6c1d6…`）平台侧失败，同版本重跑后完成；失败不占次数。
++- **事实修正（SwanLab）**：`x5kz5fn7` 是本地 `simulate_a_rounds.py` 的 **static 模拟**
++  （val 0.7140、test_mean 0.399、test_worst 0.185、**0 updates**），不是平台测评；
++  `rynlo0ne`（trigger）在 `reports/sim_a_rounds.json` 里同样 **0 updates**。
++  因此旧交接单里“trigger 隐藏-like 0.339 / 多训 = 负收益”的结论**没有当前 JSON 支撑**，
++  且平台 A 实测 0.8735 说明 batch 3–10 不是可靠的 hidden 代理；v3 已不拿它设计平台预算。
++
++### 下一步
++
++- v2 平台试运行 1 次 → 按报告决定是否调 C 预算 → 正式评测。
++- 若模型仍无文本：保持“规则执行 + `model_action=unavailable`”的诚实记录，不伪造裁决。
++
++### 阻塞
++
++- 上传/试运行/正式评测需要人工确认；无技术阻塞。
++
++---
++
++## 2026-11-20（第五段）：平台提交完成，首次试运行已排队
++
++### 完成
++
++- 镜像上传成功（`zhixun-rsi-harness:0.1`，64 MiB）；**提交版本 v1 已校验通过**
++- 表单填写：基础模型 **Qwen/Qwen3.5-4B**、训练记录 = SwanLab run `x5kz5fn7`、
++  源码 = `github.com/AliceJiuyuansi/rsi-zhixun-harness`（已 public）、PyTRiO key（新建）、
++  作品文档 = `reports/系统说明.md`
++- **首次试运行已提交**（trial，排在第 4 位；监视脚本 `_state/watch_run.py`，日志 `_state/run_watch.log`）
++- SwanLab：项目 `rsi-zhixun` 两条真实 run（static / trigger 十轮模拟，56 条记录已上传）
++- 新写 `docs/交接_2026-11-21.md`（明天一页上手）；`reports/系统说明.md`（提交三件套之一）
++
++### 待办（明天从交接单开始）
++
++1. 看试运行报告的 3 件事：每轮 `/data` 行数、父检查点路径、10 轮是否都 finish
++2. 按报告调 `decide_training_budget()`
++3. 技术报告 ≤10 页 / 演示视频 ≤5 分钟 / 来源声明
++4. 确认后再考虑「选为正式版本 + 首次正式评测」（2 次机会）
++
++### 阻塞
++
++- 试运行排队中（平台侧）；正式评测需人工确认
++
++---
++
++## 2026-11-20（第四段）：平台开放、Harness 镜像、A 任务本地闭环
++
++### 平台事实（登录后从页面/SDK 抓到的，可直接当已知条件）
++
++- 平台 `rsi-index.115.zone` 已开放，账号 `Richard1037` 登录成功；队伍 1 支、提交版本 0、评测 0
++- **每数据集 10 轮续训**；**试运行 10 次/队**（每次 = 一次完整"训练+评测"= 10 轮，累计不重置）；
++  **正式评测 2 次**（第 1 次自助、第 2 次需审批）；上传镜像/新建版本**不扣次数**
++- SDK 1.0.4：入口 `python3 /app/harness.py describe|train|predict`；`dataset_key` 只接受 A/B/C；
++  `/data`、`/previous`、`/state` 只读，`/workspace` 可写；**每轮必须至少一次真实模型调用**
++- 评分：客观 35（平均提升 15 / 最差阶段 5 / 恢复 5 / 稳定性 5 / 资源效率 5），
++  专家 65（自主决策 10 / 漂移检测 8 / 安全 6 / 系统 6 / 技术报告 6 / 路线 6 / 受控实验 5 /
++  实验记录 5 / 记录分析 5 / 工业约束 4 / 答辩 4），加分 10（扩展数据验证 5 + 技术创新 5）
++- 硬要求新增一条：**至少 3 次"读历史—做实验—依据结果决策"的完整记录**
++
++### 完成
++
++- **A 任务数据核对**：`gas+sensor+array+drift+dataset (1)/Dataset/batch{1..10}.dat`
++  与官方 `train.jsonl`(445)/`validation.jsonl`(1244) **逐位相同**（maxdiff=0.0），类别映射正确
++  → batches 3–10（12,221 条）是合法的"伪隐藏集"，**只许考、不许练**
++- **官方基线精确复现**：20 epoch → macro-F1 `0.7140297220788709`（与官方 training.json 16 位一致）
++- **漂移曲线**（`reports/gas_baseline_drift.csv`）：batch1 0.956 → batch2 0.714 → batch9 0.185
++- **续训适配器** `src/models/official_round.py`：`continue_round()` 从父检查点续训，
++  记录父子摘要、逐 epoch 历史；新增**早停 + 最佳快照**
++- **策略表** `src/policy/strategy.py`：PSI×掉分 → none / finetune(3/4/5 ep) / reweight，全部过白名单
++- **十轮模拟** `scripts/simulate_a_rounds.py`：static 隐藏-like 均值 0.399 / 最差 0.185；
++  periodic 验证刷到 0.7255 但隐藏-like 掉到 0.339 → **多训 = 负收益（过拟合旧分布）**
++- **Harness 镜像** `zhixun-rsi-harness:0.1`（linux/amd64，285 MB，tar 64 MB）：
++  `harness/harness.py` + `harness/contest_submission.py` + `vendor/contest_baselines/`
++- **本地彩排** `scripts/test_harness_local.py`：进程内假宿主 + **容器内 `--network none`**
++  跑完 describe/train(2 轮)/predict，全部 exit 0；不消耗平台次数
++- `scripts/prepare_gas.py` → `data/processed/gas/gas_all.npz` + manifest（可追溯哈希）
++
++### 未完成
++
++- 镜像**未上传**、未跑试运行（会消耗 1/10 次，需本人确认）
++- `reports/系统说明.md`、技术报告、演示视频、来源声明未写
++- `docs/open_questions.md` Q20（10 轮数据是否变化）待问
++- 训练配方（噪声增强 / 权重平均）未实验；`src/harness/loop.py` 的逐 step 内核尚未接进 `contest_submission.py`
++
++### 下一步
++
++1. 上传 tar → 新建提交版本 → **试运行 1 次**（同时验证 Q20）
++2. 按试运行报告修 `decide_training_budget`
++3. 写系统说明 + 技术报告（用漂移曲线和十轮模拟作图表）
++
++### 阻塞
++
++- 报名/推荐状态（人）；企业赛 PyTRIO 额度
++
++---
++
++## 2026-11-20（第三段）：官方三任务接入路径
++
++### 完成
++
++- 收到官方任务口径：A 气体识别（6 类 / Macro-F1）、B 轴承健康（RUL 分钟 / RMSE+MAE）、
++  C 发动机寿命（RUL 循环 / RMSE + NASA 非对称评分）
++- `docs/08_三任务落地路径.md`：三任务身份推断（UCI Gas Drift / FEMTO-ST PRONOSTIA / C-MAPSS）、
++  复用度对照、看不懂数据时的侦察三步 + 通用特征四族、指标/阈值/loader 改造清单、三天计划
++- 新增 Q16–Q19（三选一还是全做、指标口径与单位、公开集划分、能否用公开原版预训练）
++
++### 关键判断
++
++- 系统零重写：换的是**数据加载器 / 指标函数 / 阈值量纲**三样
++- B 复用度最高（已有 XJTU-SY 全链路）；A 需 macro-F1；C 需新 loader + 非对称评分
++- 阈值必须相对化（`k × std(y)`），否则 0.06 换到"分钟/循环"直接失效
++
++### 下一步
++
++1. 等 Q16 答复确定主线（推荐 B → A → C）
++2. 数据到手先跑侦察脚本，不要先建模
++3. 指标层加 `metric` 选择器（`macro_f1 / mae / rmse / nasa`），**全部转成越高越好**
++
++---
++
++## 2026-11-20（第二段）：镜像断网跑通 + 五件套 5/5
++
++### 完成
++
++- **Docker 三件套**：`Dockerfile` / `requirements.txt` / `.dockerignore` + `scripts/entrypoint.py`
++  （`docker run <image>` 零参数、零网络、恒 exit 0；镜像自带 36 维特征缓存，不挂盘也能跑）
++  - `docker pull python:3.11-slim` **直连成功** → registry mirrors 不必配，原来的"拉不到镜像"阻塞解除
++  - 镜像 `zhixun-rsi:0.1`：Python 3.11.18 + numpy/sklearn/scipy/pyyaml，565 MB；**不装 swanlab**
++  - `docker run --rm --network none` 断网 dry-run：static MAE 0.4364 / trigger 0.1292，
++    7 次重训、6 次晋升、0 回滚，退出码 0；带 `-v` 时 `run.log`/`summary.json`/各 run 目录齐全
++- **受控 RSI 五件套 5/5**：
++  - `src/policy/whitelist.py`（白名单 + 参数范围 + 外部提案解析，永不抛异常）
++  - `src/policy/bounds.py`（幅度上限：≤ 上版 2×，最多改 2 个参数）
++  - `src/policy/budget.py`（次数上限：终身 12 次 + 窗口 8 次/40 步）
++  - `src/harness/killswitch.py`（env / 配置 / STOP 文件 / 超时 / 连续异常，触发即锁死）
++  - `src/utils/audit.py`（`<run>/audit.jsonl`，append-only、逐行 flush）
++  - 统一闸口 `src/harness/guard.py`：kill-switch → 白名单 → 预算 → 幅度上限 → approve
++- **故障注入验收** `scripts/check_guard.py`：9 类（F1 白名单 / F2 坏 JSON / F3 次数 / F4 幅度 /
++  F5 kill-switch 多来源 / F6 断流 / F7 连续异常自动锁死 / F8 数据缺失 / 健康跑到尾）全部 PASS
++- **回归未变**：4 轴承 × 3 策略 × 2 seed 聚合 static −0.4070 / periodic −0.1451 / trigger −0.1060；
++  单流 `xjtu_3_4` trigger：MAE 0.1292、重训 7、晋升 6、回滚 0
++- ⚠️ 成本口径提醒：`unit_gain_cost` 是 wall-clock 计时，**机器负载能改变 ±15%**
++  （同一矩阵两次跑：periodic 114.1 → 121.9，trigger 174.7 → 178.6；MAE 不动）。
++  结论"periodic 更便宜"不变，但最终报告里的成本数字要**空载机器复测**后再定稿。
++- `ExternalPolicy`（`policy.type: external`）：LLM/外部 proposer 的接入位，
++  输出必过 `parse_proposal` + Gatekeeper，proposer 抛异常也只是 `none`
++
++### 新增产物字段
++
++- `<run>/audit.jsonl`、`<run>/guard.json`；`summary.json` 增 `guard` / `audit` / `degraded_steps`
++- `configs/base.yaml` policy 增：`max_retrains_per_window: 8`、`max_consecutive_failures: 3`、
++  `max_wall_seconds: 0`、`amplitude_factor: 2.0`
++
++### 未完成
++
++- SwanLab 云端项目 / `swanlab login`、`trio login` 仍未做（**必须本人**）
++- 报名状态、官方数据包、企业赛提交细节仍未确认
++- 跨工况域偏移流、HPO 第二层、Decision Model（企业赛）未开始
++- `reports/系统说明.md`（提交三件套之一）还没写
++
++### 下一步
++
++1. 本人：报名状态 + `swanlab login` + `trio login`（三条外部依赖）
++2. 写 `reports/系统说明.md`（怎么跑、输入输出、资源占用、五件套怎么演示）
++3. 跨工况域偏移流（35Hz 训 → 40Hz 部署）：区分"磨损"与"工况变了"
++4. `docker save` 出 `.tar` 并复核体积
++
++### 阻塞
++
++- 登录类/报名类（等本人）；官方评测平台未开放（Q8）
++
++---
++
++## 2026-11-20：新手可操作性补齐（操作手册 + 三个教学工具）
++
++### 完成
++
++- `docs/07_操作手册.md`：harness 要不要训练（三种训练拆分）、数据五步流水线、
++  本地自测三步、结果解读与排障表、动作白名单（none/retrain/finetune/swap_model/reweight
++  + 自动保护 rollback/kill-switch）、五件套自查表
++- `scripts/inspect_data.py`：原始 CSV → 36 特征 → npz → 流切分 → 误差增长，一条命令看完整条链
++- `scripts/report_run.py`：把 `summary.json`/`metrics.json` 翻成人话（去掉会误导的
++  unit_gain_cost_vs_ref，改为指向 matrix.md 与静态基线对比）
++- `scripts/export_view.py`：导出 Excel 可读 CSV（`view/数据_*.csv`、`view/对比_*.csv`）
++- Docker Desktop 29.9.3 已装并运行；**镜像加速仍未配置**，`Dockerfile`/`requirements.txt` 未写
++- 按官方 README 装好 PyTRIO 体系：`pytrio` 0.2.9（可 import）、`trio` CLI、agent skill
++  `pytrio-skill` v0.2.4（全局，`~/.agents/skills`）。**未登录**（需本人 `trio login`），校赛无额度不训练
++- 记录到 `docs/07` 3.3b（环境）与 5.6（把动作选择做成 Decision Model 的思路）
++
++### 未完成
++
++- Docker `--network none` dry-run（阻塞于镜像加速配置）
++- SwanLab 云端项目 `rsi-zhixun` 仍未创建
++- 五件套：白名单枚举已有，校验器/kill-switch/审计 JSONL 仍缺
++- `trio login` 未做（阻塞于本人操作）；PyTRIO 支持模型清单待登录后用 `get_supported_models()` 核对
++  （规则 PDF 写 Qwen3.8-27B，skill 案例用 Qwen3.5-4B，仍未消解）
++
++### 下一步
++
++1. `swanlab login` → 重跑一条流 → 云端可见
++2. 配 `registry-mirrors` → `docker pull python:3.11-slim`
++3. 写 Dockerfile 三件套 → 断网 run 通
++4. 审计日志 + kill-switch 最小实现
++
++### 阻塞
++
++- 官方评测平台未开放（Q8）；报名状态仍未核实
++
++---
++
++## 2026-11-11（当天第二段）：从零代码到真实数据闭环
++
++### 完成
++
++- 搭建完整可运行骨架：`src/`（数据/模型/漂移监控/策略/Harness 循环/成本账本/SwanLab 封装）、
++  `configs/`（6 条合成流 + 4 条真实流）、`scripts/`（smoke / stream / matrix / 特征缓存）
++- 合成漂移垂直切片已通过：static 在 concept/gradual 上掉到 0.62/0.68，
++  trigger/periodic 恢复 +0.13~0.22，且 trigger 比 periodic 便宜约 33%
++- 接入 **XJTU-SY 轴承全寿命数据集**（公开代理数据，非官方包）：
++  - `scripts/build_xjtu_cache.py` 抽取 36 维时/频特征，9,216 个快照，8 进程 131 秒
++  - 新增回归任务通路（HistGradientBoostingRegressor，perf = −MAE）
++  - 4 条真实流（Bearing3_1/3_2/3_4/2_3）× 3 策略 × 2 seed 跑通
++- 修复真实数据暴露的三个设计缺陷：
++  1. PSI 只用单步 batch（6 行）计算 → 恒为 0，全部误判 concept；改为用最近 40 步窗口
++  2. 晋升门控拿"不同分布上的验证分"比较 → 挑战者永远输；改为冠军/挑战者在**同一 holdout** 上比较
++  3. 分组聚合把一步压成一行 → 训练历史不足；改为保留快照级样本、同一步多样本
++- 真实数据结果：静态 MAE 0.34–0.45，periodic 0.11–0.20，trigger 0.09–0.12；
++  单位增益成本 periodic 92 vs trigger 143 → **周期重训更划算**（详见 `docs/05`）
++
++### 未完成
++
++- 队伍报名状态仍未知；官方数据包仍未开放
++- SwanLab 项目 `rsi-zhixun` 仍未在云端创建（本地 `swanlog/` 已验证）
++- 跨工况域偏移流、超参数第二层、LLM Harness 均未开始
++
++### 下一步
++
++1. 跨工况流：35Hz/12kN 训练 → 40Hz/10kN 部署
++2. 策略层自进化（超参搜索）接入同一门控与成本账本
++3. 登录 SwanLab 后把这批 run 重放到云端，作"完整记录"演练
++4. 官方数据包开放后优先重跑 `docs/05` 第 4 节
++
++### 阻塞
++
++- 报名状态、官方数据包与评测平台（均等外部）
++
++---
++
++## 2026-11-11（项目第 0 天）
++
++### 完成
++
++- 读完 `赛题规则.pdf` 全文，产出 `docs/00_赛题规则解读.md`
++- 核实官方赛程，发现 `plan0.md` 时间轴整体晚约 3 周，产出 `docs/01` 与 `plan1.md`
++- 建立工作区文档体系（README / AGENTS / docs 五篇 / plan1）
++- 确认 SwanLab 团队空间存在：`@xiangxinnidexin`（"相信你的心"，中国人民大学，北京）
++
++### 未完成
++
++- 队伍报名状态未知（**最紧急**）
++- 官方数据包未下载
++- SwanLab 项目未创建、smoke run 未跑
++- 答疑群未进、问题未发
++- 代码为零
++
++### 新增问题
++
++- Q1–Q15 全部登记在 `docs/open_questions.md`，均待确认
++
++### 下一步
++
++1. 今天：确认报名 + 进群发问 + 建 SwanLab 项目
++2. 11-12：数据包 + schema + smoke
++3. 11-18：垂直切片（基线 + 流评测 + 成本 + 4 条合成流）
++
++### 阻塞
++
++- 报名状态（等教务处/组委会）
++- 官方数据包与评测平台（等平台开放）
++
++---
++
++## 决策日志
++
++| 日期 | 决策 | 理由 | 证据 |
++|---|---|---|---|
++| 2026-11-11 | 以 `plan1.md` 取代 `plan0.md` 作为执行计划 | plan0 的日期与官方赛程冲突，且缺少资格确认与分工 | `docs/01`、`docs/02` |
++| 2026-11-11 | 保留 `plan0.md` 不修改 | 留痕，便于复盘；避免历史信息丢失 | — |
++| 2026-11-11 | 一人一个 SwanLab 账号，共用一个团队项目 | 规则禁止账号转借；run 需可追溯到人 | `docs/00` 第十节 |
++| 2026-11-11 | 官方包未开放期间用 XJTU-SY 作代理数据 | 全寿命退化天然对应 RUL 预测；结果标 `proxy`，不冒充官方成绩 | `data/VERSION.md` |
++| 2026-11-11 | 任务默认做 RUL 回归，分类作为可切换分支 | 官方赛题写"剩余寿命预测"；回归与官方口径更接近 | `docs/05` 第 2 节 |
++| 2026-11-11 | 晋升必须在**同一 holdout** 上比较冠军与挑战者 | 跨分布比较会让挑战者永远输，实测真实数据 0 次晋升 | `src/harness/loop.py` |
++| 2026-11-20 | Harness 本身不"训练"：校赛阶段用规则+校验，PyTRIO 微调留到企业赛 | 校赛无 PyTRIO 额度；规则版可解释、可离线、成本为 0 | `docs/07` 第 1 节 |
++| 2026-11-20 | 次数上限做成两层：终身 ≤12 + 窗口 ≤8/40 步 | 主限速仍是 `retrain_cooldown`，窗口上限只防突刺；设成 4/40 会误伤正常触发式（实测 MAE 0.129→0.173，多出 1 次回滚） | `scripts/check_guard.py` F3、`experiments/matrix-*` |
++| 2026-11-20 | 未实现的动作（finetune/swap_model/reweight）在白名单里"声明但不放行" | 防止 LLM 提名后被静默当 retrain 执行；没有执行器就不许选 | `src/harness/guard.py`、F1 |
++| 2026-11-20 | 镜像不装 swanlab，入口固定 `RSI_SWAN_MODE=disabled` | 断网是硬约束，装了也连不上，反而制造出网尝试；云端记录由宿主机跑的实验负责 | `Dockerfile`、`scripts/entrypoint.py` |
++| 2026-11-20 | 镜像把 36 维特征缓存烤进去（1.3 MB），不要求挂盘 | 评测机挂载方式未知（Q8 未确认），自包含最稳；原始 16 GB 数据集不进镜像 | `Dockerfile`、`.dockerignore` |
++| 2026-11-23 | v2 把“连续 2 轮无收益就停手”放在重训之前 | v1 报告显示 C 第 4–10 轮、B 第 3–10 轮候选全被拒却仍花 4/5 epoch；停手不改变已选模型，只省算力 | `reports/v2_replay_v1.md`、v1 trial report |
++| 2026-11-23 | 回归 gap 改为相对 RMSE，`best` 不再用 0 初始化 | 绝对值 600/50 会把任何阈值冲垮，导致每轮无条件重训 | `src/harness/round_controller.py`、单测 |
++| 2026-11-23 | 模型裁决只允许“收窄/保持/回滚”，不允许放大预算 | 4B 基础模型可能给出不可靠建议；规则保底、模型只能减少风险，符合“受控 RSI” | `apply_verdict()`、`docs/04` §4.6 |
++| 2026-11-23 | 平台入口接入 Gatekeeper（白名单/幅度/次数/kill-switch） | v1 平台路径绕过了本地闸门；专家分里的“安全/受控实验”需要证据 | `harness/contest_submission.py`、`scripts/check_guard.py` |
++
++## 版本记录维护
++
++每次创建提交版本时，在[版本演进记录](版本演进记录.md)追加方案、改进手段和理由；运行结束后在同一节回填结果与取舍。
+--- a/docs/交接_2026-11-23.md
++++ b/docs/交接_2026-11-23.md
+@@ -1,190 +1,192 @@
+-> 2026-11-25 更新：v15 本地候选已交付。仅调整 C 的后期预算/有界探针，保留 v14 校准与门禁；85 项测试通过，固定公开 C 十轮 NASA -4.43%、RMSE +0.13%。未做平台/SDK/容器验收。详见 [v15交付](../reports/v15_交付_2026-11-25.md)。以下为历史记录。
+-
+-# 交接 · 2026-11-23（v2 已测完：B 减半；v3 完成：C 上限被证伪）
+-
+-<!-- latest-trials -->
+-A/B/C 按最新交接与正式评测步骤各占三分之一；已测版本继续以 v5 作为整体参考，v6 仅作对照。v7.1 为本地工程修复候选，尚无平台成绩、未启动试运行。详见 [v7.1交付](../reports/v7.1_交付_2026-11-24.md)。
+-<!-- /latest-trials -->
+-
+-> **并行分支补充（`fix/cap-nasa-gate`）**：用户附件 3 显示 v3 已完成；
+-> 该分支尝试 C `min(0.9*value,130)` + 服务端 NASA≤1e6 门禁，公开验证证明
+-> **cap130 与 NASA≤1e6 不可同时满足**，候选会被冻结，**未通过性能验收，不应直接用于试运行**。
+-> 该分支 47 项离线测试通过，但 SDK/容器验收未完成；详见 `reports/P0_交付_2026-11-23.md`、
+-> `reports/数学建模与优化报告.md`（**并行分支文件，本仓库暂无**）。附件 2/3 的 30 轮裁决均 unavailable，
+-> A 降分不能归因于 LLM；
+-> archive ID 不是 OCI digest。没有执行任何平台动作。
+-
+-> 前一份：`docs/交接_2026-11-21.md`。本文只讲**现在在哪、下一步按什么顺序做**。
+-> 事实源：`赛题规则.pdf` > 组委会答复 > 平台页面/API（今天实测）> `docs/00` `docs/01`。
+-
+----
+-
+-## 0. 一分钟现状
+-
+-| 项 | 状态 |
+-|---|---|
+-| v1 试运行 | **已完成**：A 0.8735 / B MAE 506.67 / C 41.12 |
+-| v2 试运行 | **已完成**（22:30）：A 0.8674（-0.69%）、B MAE **251.70（-50.3%）**、C 41.12（同一模型） |
+-| v2 资源 | 总 epoch 119→66（-44.5%），墙钟 8,160→3,917 s（-52%），CPU -5.7% |
+-| v3 试运行 | **已完成**（22:44）：A/B 与 v2 相同；C 因 145 上限变差（MAE 43.79、NASA 2.44×10¹²） |
+-| 下一步 | **v4：只移除 C 上限**（A/B 不动）→ 试运行；**v5：只改 A 新阶段 2→3**（固定预算消融） |
+-| 预算回放 | v1 119 epoch → 预测 63，实际 66；停手规则命中 |
+-| 提交版本 | v1/v2/v3 均 valid；**v3 是最终版**（id `b318577…`，镜像 `880b0fd…`） |
+-| 试运行次数 | **3 / 10 已用**（v1/v2/v3），剩 7；正式评测 **0 / 3** |
+-| 材料 | 技术报告、来源声明、视频分镜、系统说明、试运行记录都已在 `reports/` / `docs/` |
+-
+----
+-
+-## 1. 今天（11-23）做完了什么
+-
+-**v1 复盘**
+-- 读回 v1 报告：A/B/C × 10 轮，`record_complete=true`、`training_complete=true`
+-- 三个待查点：`/data` 按阶段变化；父检查点路径稳定；10 轮都 `finish`
+-- 四个缺陷：回归初值 0；Qwen 回复在 `reasoning_content`；被拒仍重训；漂移参考不跨轮
+-
+-**v2 实测（run `2b638d5a…`，submission v2）**
+-
+-| 数据集 | v1 | v2 | 变化 |
+-|---|---:|---:|---:|
+-| A macro-F1 | 0.8735 | 0.8674 | -0.0060（-0.69%） |
+-| B MAE | 506.67 | **251.70** | **-50.3%** |
+-| C MAE | 41.12 | 41.12 | 0（同一模型） |
+-| 总 epoch | 119 | 66 | -44.5% |
+-| 墙钟 | 8,160 s | 3,917 s | -52.0% |
+-
+-- B 收益最大：第 2/3/8/9 轮拿到正收益，最终第 9 轮模型；
+-- A 小幅回落：总 epoch 28→23，部分新阶段只给 2；下一步 A 新阶段调回 3；
+-- C 没变：v2 仍选第 3 轮，停手只省 23 epoch；C 上限只在 v3。
+-
+-**v3 实测（run `27143ad1…`，镜像 0.3）**
+-
+-- A/B 与 v2 逐位相同；C 因 `min(value,145)` 全面变差：
+-  MAE 41.12→**43.79**（+6.5%）、RMSE 56.38→**62.88**（+11.5%）、
+-  NASA 8.85×10¹⁰→**2.44×10¹²**（27.6×）。
+-- 原因：C 的 RUL 真值最大 542，公开验证集 33% 的样本 >145；上限把真实高 RUL 压成低估，
+-  NASA 对低估也是指数惩罚。**145 被证伪，v4 移除。**
+-
+-**代码（v2/v3）**
+-- `src/harness/round_controller.py`：参考画像、PSI、预测 JS、历史摘要、预算表、裁决解析、验收、C 上限
+-- `harness/contest_submission.py`：读历史 → 调模型 → Gatekeeper → 续训 → 验收 → 写状态/审计
+-- 状态 schema 2：`profile/baseline_profile/pred_profile`、`best/last/last_gain/stalled`、
+-  `decisions[≤10]`、`bounds/budget_steps/audit_events`
+-- `tests/test_round_controller.py`：24 项；`scripts/replay_trial.py`：回放报告
+-
+-**验证**
+-- A 10 轮（逐轮增长）、B 3 轮、C 3 轮、C 全量首轮（RMSE 52.87→52.00，+1.65%）
+-- 容器内 `--network none` A 3 轮；`describe` 正常
+-- `dist/zhixun-rsi-harness-0.3.tar` 已导出
+-
+-**平台**
+-- v2 初版镜像已上传：archive `88f5afb…`（ready）；提交版本 v2 `8636a3d…` 已 valid
+-- **v3 最终版**：镜像 `0.3` archive `880b0fd503abcc04b0d49433c15eeafb`（ready，64 MiB）；
+-  提交版本 `b318577fbc02cdfeb8504ac94c707c10`，`status=valid`，
+-  文档为含 C 题 145 上限的 `系统说明.md`
+-- 试运行请用 **v3**，不要用 v2（v2 是没有 C 上限的中间版本）
+-
+----
+-
+-## 2. 平台口径（今天核实，照这个填）
+-
+-| 项 | 数值 |
+-|---|---|
+-| 每数据集轮次 | 10 轮续训（A/B/C 都跑） |
+-| 试运行 | 10 次/队；**已用 3**（v1/v2/v3）；上传镜像/建版本/校验不扣 |
+-| 正式评测 | **3 次**（`formal_limit=3`，`formal_remaining=3`）；与旧交接单的 2 次不一致，以平台为准 |
+-| 扣次数时机 | 只有点「试运行」「开始正式评测」才扣 |
+-| 提交版本表单 | 镜像、模型类型（基础模型 → `Qwen/Qwen3.5-4B`）、训练记录（SwanLab）、源码仓库、PyTRiO key、作品文档 |
+-
+-**v3 填表值（照抄）**
+-
+-```text
+-镜像          dist/zhixun-rsi-harness-0.3.tar  ->  zhixun-rsi-harness:0.3
+-模型类型      base / 基础模型
+-基础模型      Qwen/Qwen3.5-4B
+-训练记录      https://swanlab.cn/@xiangxinnidexin/rsi-zhixun/runs/x5kz5fn7
+-源码仓库      https://github.com/AliceJiuyuansi/rsi-zhixun-harness
+-PyTRiO Key    _state/pytrio_key.txt（只填表单，不进仓库）
+-作品文档      reports/系统说明.md（或 reports/技术报告_v2.md）
+-```
+-
+----
+-
+-## 3. 第二次提交按这个顺序（别跳）
+-
+-1. ~~**上传镜像**~~ ✅：最终版 archive `880b0fd503abcc04b0d49433c15eeafb`（ready，64 MiB）。
+-2. ~~**新建提交版本 v3**~~ ✅：id `b318577fbc02cdfeb8504ac94c707c10`，`status=valid`；
+-   模型 `Qwen/Qwen3.5-4B`、训练记录/源码同 v1、文档 `系统说明.md`。
+-3. ~~**校验版本**~~ ✅：v2 首次返回 `模型服务暂不可用`，退避后重试成功；v3 一次通过。
+-4. ~~**用 v3 跑 1 次试运行**~~ ✅（run `27143ad1…`）：A/B 与 v2 相同，C 因 145 上限变差，
+-   上限被证伪。
+-5. **v4**：只移除 C 的 145 上限，A/B 预算保持 v2；跑 1 次试运行（trial 剩 7）。
+-6. **v5**：只把 A 的新阶段预算从 2 调回 3（固定预算消融），B/C 不动；跑 1 次。
+-7. **可选对照**：静态基线版（永远保留父模型）跑 1 次，测 B/C 的隐藏基线。
+-8. **录视频**：按 `docs/演示视频分镜.md`，≤5 分钟；不要点试运行按钮。
+-9. **确认后再点「选为正式版本 + 开始正式评测」**。
+-
+-> 注意：正式评测 3 次机会是“自助 + 审批”的混合，不要一次把 3 次用完；
+-> 第一次正式跑之前先看试运行报告。
+-
+----
+-
+-## 4. 关键文件地图
+-
+-| 用途 | 路径 |
+-|---|---|
+-| 平台入口 | `harness/harness.py`、`harness/contest_submission.py` |
+-| v2 控制器 | `src/harness/round_controller.py` |
+-| 续训 + 早停 | `src/models/official_round.py` |
+-| 五件套 | `src/policy/{whitelist,bounds,budget}.py`、`src/harness/{guard,killswitch}.py`、`src/utils/audit.py` |
+-| 单测 | `tests/test_round_controller.py` |
+-| 彩排 | `scripts/test_harness_local.py`（`--dataset A/B/C`、`--grow`、`--docker`） |
+-| 回放 | `scripts/replay_trial.py` → `reports/v2_replay_v1.{md,json}` |
+-| v1 报告原文 | `_state/trial_report_completed.json`（不进 git） |
+-| v2 报告原文 | `_state/trial_report_v2.json`（不进 git） |
+-| 镜像 | `harness.Dockerfile` → `zhixun-rsi-harness:0.3`；tar 在 `dist/`（不入库） |
+-| 技术报告 | `reports/技术报告_v2.md` |
+-| 试运行记录 | `reports/trial_runs.md` |
+-| 来源声明 | `reports/来源声明.md` |
+-| 视频分镜 | `docs/演示视频分镜.md` |
+-| v1 交接 | `docs/交接_2026-11-21.md` |
+-
+----
+-
+-## 5. 红线与坑（继续遵守）
+-
+-- **隐藏集只考不练**：batches 3–10 / 平台隐藏阶段绝不进梯度训练；公开验证可用于测量/选择。
+-- **不补录 SwanLab**：平台试运行结果不能事后写进 SwanLab；SwanLab 只记本地实验。
+-- **候选必须同验证集不劣于父模型**才提交；没把握就 `none`。
+-- **模型裁决不是免责牌**：没有文本就记 `unavailable`，不许编造“模型建议”。
+-- **正式评测次数宝贵**：2026-11-23 平台显示 3 次；先试运行、再正式。
+-- `data/`、`experiments/`、`_state/`、`dist/`、原始数据集、任何 key 都不进 git。
+-
+----
+-
+-## 6. 一句话给下一次会话
+-
+-> v1/v2/v3 都测完：v2 把 B 的 MAE/RMSE 和墙钟减半；v3 的 C 上限被证伪；
+-> 下一步 v4 只移除 C 上限，v5 再做 A 预算的固定消融。
+-
+----
+-
+-## 7. 并行分支 `harness_20261123` 的补充（已吸收/已修正）
+-
+-远端还有一个 11-23 的分支（`harness_20261123` / `dd7ec85`），贡献了几条有用判断：
+-
+-- **C 的 NASA 爆炸归因**：隐藏样本只评最后一个观测循环，真值 RUL 不超过约 145；
+-  v1 的模型输出高估，指数惩罚把分数炸到 8.85×10¹⁰。→ v3 已在
+-  `predict()` 对 24 特征任务加 `min(value, 145)`（已吸收进主分支）。
+-- **采纳阈值**：文字红线是“不劣于父模型”，不应允许 0.02 的退步。→ v3 已改为
+-  `gain ≥ 0` 才接受、`≥ +0.002 / +0.2%` 才提交（已吸收）。
+-- **隐藏集构成**：A 报告 0.8735 与本地 proxy 0.399 差距很大，推测隐藏集不是 batch 3–10，
+-  而更像全量随机留出；**未确认**，登记在 Q20，不要当事实。
+-- 该分支在本机**没能跑全流程**（缺 `_sdk/`、`data/raw/official_a`），
+-  v3 的本地彩排、回放、镜像与平台 submit 均由主分支完成。
+-- 该分支写“正式评测 2 次”，平台 API 现为 `formal_limit=3`；**以平台为准**。
+-- **SwanLab 不是平台测评**：`x5kz5fn7` 是本地 static 模拟（val 0.7140、test_mean 0.399、
+-  0 updates），`rynlo0ne` 的 `sim_a_rounds.json` 同样 0 updates；旧交接单的
+-  “trigger 0.339 / 多训负收益”没有当前数据支撑，平台 A 实测 0.8735 已说明
+-  batch 3–10 不能当 hidden 代理。喂给平台的训练记录链接只代表“本地实验”，不代表隐藏分。
+-
+-> 结论：分支里的 C 上限与严格采纳已合并；其余以本交接单和 `docs/status.md` 为准。
++> 2026-11-25 v16 更新：修复队友交付包混合旧模块问题，沿用完整 v15 算法；92 项单测通过，A/B/C 公开推理哈希一致。新增运行模块清单、镜像构建预检、导出后解压验收。未做容器/SDK/平台验收。详见 [v16比较与交付](../reports/v16_比较与交付.md)。以下为历史记录。
++
++> 2026-11-25 更新：v15 本地候选已交付。仅调整 C 的后期预算/有界探针，保留 v14 校准与门禁；85 项测试通过，固定公开 C 十轮 NASA -4.43%、RMSE +0.13%。未做平台/SDK/容器验收。详见 [v15交付](../reports/v15_交付_2026-11-25.md)。以下为历史记录。
++
++# 交接 · 2026-11-23（v2 已测完：B 减半；v3 完成：C 上限被证伪）
++
++<!-- latest-trials -->
++A/B/C 按最新交接与正式评测步骤各占三分之一；已测版本继续以 v5 作为整体参考，v6 仅作对照。v7.1 为本地工程修复候选，尚无平台成绩、未启动试运行。详见 [v7.1交付](../reports/v7.1_交付_2026-11-24.md)。
++<!-- /latest-trials -->
++
++> **并行分支补充（`fix/cap-nasa-gate`）**：用户附件 3 显示 v3 已完成；
++> 该分支尝试 C `min(0.9*value,130)` + 服务端 NASA≤1e6 门禁，公开验证证明
++> **cap130 与 NASA≤1e6 不可同时满足**，候选会被冻结，**未通过性能验收，不应直接用于试运行**。
++> 该分支 47 项离线测试通过，但 SDK/容器验收未完成；详见 `reports/P0_交付_2026-11-23.md`、
++> `reports/数学建模与优化报告.md`（**并行分支文件，本仓库暂无**）。附件 2/3 的 30 轮裁决均 unavailable，
++> A 降分不能归因于 LLM；
++> archive ID 不是 OCI digest。没有执行任何平台动作。
++
++> 前一份：`docs/交接_2026-11-21.md`。本文只讲**现在在哪、下一步按什么顺序做**。
++> 事实源：`赛题规则.pdf` > 组委会答复 > 平台页面/API（今天实测）> `docs/00` `docs/01`。
++
++---
++
++## 0. 一分钟现状
++
++| 项 | 状态 |
++|---|---|
++| v1 试运行 | **已完成**：A 0.8735 / B MAE 506.67 / C 41.12 |
++| v2 试运行 | **已完成**（22:30）：A 0.8674（-0.69%）、B MAE **251.70（-50.3%）**、C 41.12（同一模型） |
++| v2 资源 | 总 epoch 119→66（-44.5%），墙钟 8,160→3,927 s（-52%），CPU -5.7% |
++| v3 试运行 | **已完成**（22:44）：A/B 与 v2 相同；C 因 145 上限变差（MAE 43.79、NASA 2.44×10¹²） |
++| 下一步 | **v4：只移除 C 上限**（A/B 不动）→ 试运行；**v5：只改 A 新阶段 2→3**（固定预算消融） |
++| 预算回放 | v1 119 epoch → 预测 63，实际 66；停手规则命中 |
++| 提交版本 | v1/v2/v3 均 valid；**v3 是最终版**（id `b318577…`，镜像 `880b0fd…`） |
++| 试运行次数 | **3 / 10 已用**（v1/v2/v3），剩 7；正式评测 **0 / 3** |
++| 材料 | 技术报告、来源声明、视频分镜、系统说明、试运行记录都已在 `reports/` / `docs/` |
++
++---
++
++## 1. 今天（11-23）做完了什么
++
++**v1 复盘**
++- 读回 v1 报告：A/B/C × 10 轮，`record_complete=true`、`training_complete=true`
++- 三个待查点：`/data` 按阶段变化；父检查点路径稳定；10 轮都 `finish`
++- 四个缺陷：回归初值 0；Qwen 回复在 `reasoning_content`；被拒仍重训；漂移参考不跨轮
++
++**v2 实测（run `2b638d5a…`，submission v2）**
++
++| 数据集 | v1 | v2 | 变化 |
++|---|---:|---:|---:|
++| A macro-F1 | 0.8735 | 0.8674 | -0.0060（-0.69%） |
++| B MAE | 506.67 | **251.70** | **-50.3%** |
++| C MAE | 41.12 | 41.12 | 0（同一模型） |
++| 总 epoch | 119 | 66 | -44.5% |
++| 墙钟 | 8,160 s | 3,927 s | -52.0% |
++
++- B 收益最大：第 2/3/8/9 轮拿到正收益，最终第 9 轮模型；
++- A 小幅回落：总 epoch 28→23，部分新阶段只给 2；下一步 A 新阶段调回 3；
++- C 没变：v2 仍选第 3 轮，停手只省 23 epoch；C 上限只在 v3。
++
++**v3 实测（run `27143ad1…`，镜像 0.3）**
++
++- A/B 与 v2 逐位相同；C 因 `min(value,145)` 全面变差：
++  MAE 41.12→**43.79**（+6.5%）、RMSE 56.38→**62.88**（+11.5%）、
++  NASA 8.85×10¹⁰→**2.44×10¹²**（27.6×）。
++- 原因：C 的 RUL 真值最大 542，公开验证集 33% 的样本 >145；上限把真实高 RUL 压成低估，
++  NASA 对低估也是指数惩罚。**145 被证伪，v4 移除。**
++
++**代码（v2/v3）**
++- `src/harness/round_controller.py`：参考画像、PSI、预测 JS、历史摘要、预算表、裁决解析、验收、C 上限
++- `harness/contest_submission.py`：读历史 → 调模型 → Gatekeeper → 续训 → 验收 → 写状态/审计
++- 状态 schema 2：`profile/baseline_profile/pred_profile`、`best/last/last_gain/stalled`、
++  `decisions[≤10]`、`bounds/budget_steps/audit_events`
++- `tests/test_round_controller.py`：24 项；`scripts/replay_trial.py`：回放报告
++
++**验证**
++- A 10 轮（逐轮增长）、B 3 轮、C 3 轮、C 全量首轮（RMSE 52.87→52.00，+1.65%）
++- 容器内 `--network none` A 3 轮；`describe` 正常
++- `dist/zhixun-rsi-harness-0.3.tar` 已导出
++
++**平台**
++- v2 初版镜像已上传：archive `88f5afb…`（ready）；提交版本 v2 `8636a3d…` 已 valid
++- **v3 最终版**：镜像 `0.3` archive `880b0fd503abcc04b0d49433c15eeafb`（ready，64 MiB）；
++  提交版本 `b318577fbc02cdfeb8504ac94c707c10`，`status=valid`，
++  文档为含 C 题 145 上限的 `系统说明.md`
++- 试运行请用 **v3**，不要用 v2（v2 是没有 C 上限的中间版本）
++
++---
++
++## 2. 平台口径（今天核实，照这个填）
++
++| 项 | 数值 |
++|---|---|
++| 每数据集轮次 | 10 轮续训（A/B/C 都跑） |
++| 试运行 | 10 次/队；**已用 3**（v1/v2/v3）；上传镜像/建版本/校验不扣 |
++| 正式评测 | **3 次**（`formal_limit=3`，`formal_remaining=3`）；与旧交接单的 2 次不一致，以平台为准 |
++| 扣次数时机 | 只有点「试运行」「开始正式评测」才扣 |
++| 提交版本表单 | 镜像、模型类型（基础模型 → `Qwen/Qwen3.5-4B`）、训练记录（SwanLab）、源码仓库、PyTRiO key、作品文档 |
++
++**v3 填表值（照抄）**
++
++```text
++镜像          dist/zhixun-rsi-harness-0.3.tar  ->  zhixun-rsi-harness:0.3
++模型类型      base / 基础模型
++基础模型      Qwen/Qwen3.5-4B
++训练记录      https://swanlab.cn/@xiangxinnidexin/rsi-zhixun/runs/x5kz5fn7
++源码仓库      https://github.com/AliceJiuyuansi/rsi-zhixun-harness
++PyTRiO Key    _state/pytrio_key.txt（只填表单，不进仓库）
++作品文档      reports/系统说明.md（或 reports/技术报告_v2.md）
++```
++
++---
++
++## 3. 第二次提交按这个顺序（别跳）
++
++1. ~~**上传镜像**~~ ✅：最终版 archive `880b0fd503abcc04b0d49433c15eeafb`（ready，64 MiB）。
++2. ~~**新建提交版本 v3**~~ ✅：id `b318577fbc02cdfeb8504ac94c707c10`，`status=valid`；
++   模型 `Qwen/Qwen3.5-4B`、训练记录/源码同 v1、文档 `系统说明.md`。
++3. ~~**校验版本**~~ ✅：v2 首次返回 `模型服务暂不可用`，退避后重试成功；v3 一次通过。
++4. ~~**用 v3 跑 1 次试运行**~~ ✅（run `27143ad1…`）：A/B 与 v2 相同，C 因 145 上限变差，
++   上限被证伪。
++5. **v4**：只移除 C 的 145 上限，A/B 预算保持 v2；跑 1 次试运行（trial 剩 7）。
++6. **v5**：只把 A 的新阶段预算从 2 调回 3（固定预算消融），B/C 不动；跑 1 次。
++7. **可选对照**：静态基线版（永远保留父模型）跑 1 次，测 B/C 的隐藏基线。
++8. **录视频**：按 `docs/演示视频分镜.md`，≤5 分钟；不要点试运行按钮。
++9. **确认后再点「选为正式版本 + 开始正式评测」**。
++
++> 注意：正式评测 3 次机会是“自助 + 审批”的混合，不要一次把 3 次用完；
++> 第一次正式跑之前先看试运行报告。
++
++---
++
++## 4. 关键文件地图
++
++| 用途 | 路径 |
++|---|---|
++| 平台入口 | `harness/harness.py`、`harness/contest_submission.py` |
++| v2 控制器 | `src/harness/round_controller.py` |
++| 续训 + 早停 | `src/models/official_round.py` |
++| 五件套 | `src/policy/{whitelist,bounds,budget}.py`、`src/harness/{guard,killswitch}.py`、`src/utils/audit.py` |
++| 单测 | `tests/test_round_controller.py` |
++| 彩排 | `scripts/test_harness_local.py`（`--dataset A/B/C`、`--grow`、`--docker`） |
++| 回放 | `scripts/replay_trial.py` → `reports/v2_replay_v1.{md,json}` |
++| v1 报告原文 | `_state/trial_report_completed.json`（不进 git） |
++| v2 报告原文 | `_state/trial_report_v2.json`（不进 git） |
++| 镜像 | `harness.Dockerfile` → `zhixun-rsi-harness:0.3`；tar 在 `dist/`（不入库） |
++| 技术报告 | `reports/技术报告_v2.md` |
++| 试运行记录 | `reports/trial_runs.md` |
++| 来源声明 | `reports/来源声明.md` |
++| 视频分镜 | `docs/演示视频分镜.md` |
++| v1 交接 | `docs/交接_2026-11-21.md` |
++
++---
++
++## 5. 红线与坑（继续遵守）
++
++- **隐藏集只考不练**：batches 3–10 / 平台隐藏阶段绝不进梯度训练；公开验证可用于测量/选择。
++- **不补录 SwanLab**：平台试运行结果不能事后写进 SwanLab；SwanLab 只记本地实验。
++- **候选必须同验证集不劣于父模型**才提交；没把握就 `none`。
++- **模型裁决不是免责牌**：没有文本就记 `unavailable`，不许编造“模型建议”。
++- **正式评测次数宝贵**：2026-11-23 平台显示 3 次；先试运行、再正式。
++- `data/`、`experiments/`、`_state/`、`dist/`、原始数据集、任何 key 都不进 git。
++
++---
++
++## 6. 一句话给下一次会话
++
++> v1/v2/v3 都测完：v2 把 B 的 MAE/RMSE 和墙钟减半；v3 的 C 上限被证伪；
++> 下一步 v4 只移除 C 上限，v5 再做 A 预算的固定消融。
++
++---
++
++## 7. 并行分支 `harness_20261123` 的补充（已吸收/已修正）
++
++远端还有一个 11-23 的分支（`harness_20261123` / `dd7ec85`），贡献了几条有用判断：
++
++- **C 的 NASA 爆炸归因**：隐藏样本只评最后一个观测循环，真值 RUL 不超过约 145；
++  v1 的模型输出高估，指数惩罚把分数炸到 8.85×10¹⁰。→ v3 已在
++  `predict()` 对 24 特征任务加 `min(value, 145)`（已吸收进主分支）。
++- **采纳阈值**：文字红线是“不劣于父模型”，不应允许 0.02 的退步。→ v3 已改为
++  `gain ≥ 0` 才接受、`≥ +0.002 / +0.2%` 才提交（已吸收）。
++- **隐藏集构成**：A 报告 0.8735 与本地 proxy 0.399 差距很大，推测隐藏集不是 batch 3–10，
++  而更像全量随机留出；**未确认**，登记在 Q20，不要当事实。
++- 该分支在本机**没能跑全流程**（缺 `_sdk/`、`data/raw/official_a`），
++  v3 的本地彩排、回放、镜像与平台 submit 均由主分支完成。
++- 该分支写“正式评测 2 次”，平台 API 现为 `formal_limit=3`；**以平台为准**。
++- **SwanLab 不是平台测评**：`x5kz5fn7` 是本地 static 模拟（val 0.7140、test_mean 0.399、
++  0 updates），`rynlo0ne` 的 `sim_a_rounds.json` 同样 0 updates；旧交接单的
++  “trigger 0.339 / 多训负收益”没有当前数据支撑，平台 A 实测 0.8735 已说明
++  batch 3–10 不能当 hidden 代理。喂给平台的训练记录链接只代表“本地实验”，不代表隐藏分。
++
++> 结论：分支里的 C 上限与严格采纳已合并；其余以本交接单和 `docs/status.md` 为准。
+--- a/harness.Dockerfile
++++ b/harness.Dockerfile
+@@ -1,55 +1,60 @@
+-# 智训引擎 · Harness 镜像（平台提交用）
+-#
+-# 与 zhixun-rsi:0.1 的区别：这个镜像不跑我们自己的实验循环，而是实现平台的
+-# 三合一入口 describe / train / predict，靠 SDK 与宿主通信。
+-# 平台调用方式：`python3 /app/harness.py describe|train|predict`
+-#
+-# v0.2（2026-11-23）：platform entry now uses the v2 round controller
+-# (cross-round drift reference, history read-back, model verdict, stall rule,
+-#  and the Gatekeeper's whitelist/budget/bounds/kill-switch).
+-#
+-#   docker build -f harness.Dockerfile -t zhixun-rsi-harness:0.15 .
+-#   docker run --rm --network none zhixun-rsi-harness:0.15 describe
+-FROM python:3.11-slim
+-
+-ARG RSI_RELEASE=0.15
+-LABEL org.opencontainers.image.title="zhixun-rsi-harness" \
+-      org.opencontainers.image.version="${RSI_RELEASE}" \
+-      org.opencontainers.image.description="Contest 9 harness: offline continuation + drift-gated updates"
+-
+-ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+-ARG RSI_C_CALIBRATION=1
+-ARG RSI_C_CAL_MODE=
+-
+-ENV PYTHONUNBUFFERED=1 \
+-    PYTHONIOENCODING=utf-8 \
+-    PYTHONDONTWRITEBYTECODE=1 \
+-    PIP_NO_CACHE_DIR=1 \
+-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+-    CONTEST_APP=/app \
+-    CONTEST_SUBMISSION=contest_submission \
+-    PYTHONPATH=/app \
+-    RSI_SWAN_MODE=disabled \
+-    RSI_RELEASE=${RSI_RELEASE} \
+-    RSI_C_CALIBRATION=${RSI_C_CALIBRATION} \
+-    RSI_C_CAL_MODE=${RSI_C_CAL_MODE}
+-
+-# 1) SDK（官方 1.0.4，随平台下载包，不打网络补丁）
+-COPY _sdk/contest-harness-sdk-1.0.4 /opt/contest-harness-sdk
+-RUN pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" numpy \
+-    && pip install --no-cache-dir /opt/contest-harness-sdk
+-
+-# 2) 我们自己的代码：官方基线副本 + 续训适配器 + 策略 + 入口
+-COPY vendor /app/vendor
+-COPY src /app/src
+-COPY harness/harness.py /app/harness.py
+-COPY harness/contest_submission.py /app/contest_submission.py
+-
+-# 3) 平台约定的挂载点（运行时不写 /app）
+-RUN mkdir -p /app /data /previous /state /workspace && chmod 1777 /workspace /tmp
+-
+-WORKDIR /app
+-USER 65534:65534
+-
+-ENTRYPOINT ["python3", "/app/harness.py"]
+-CMD ["describe"]
++# 智训引擎 · Harness 镜像（平台提交用）
++#
++# 与 zhixun-rsi:0.1 的区别：这个镜像不跑我们自己的实验循环，而是实现平台的
++# 三合一入口 describe / train / predict，靠 SDK 与宿主通信。
++# 平台调用方式：`python3 /app/harness.py describe|train|predict`
++#
++# v0.2（2026-11-23）：platform entry now uses the v2 round controller
++# (cross-round drift reference, history read-back, model verdict, stall rule,
++#  and the Gatekeeper's whitelist/budget/bounds/kill-switch).
++#
++#   docker build -f harness.Dockerfile -t zhixun-rsi-harness:0.16 .
++#   docker run --rm --network none zhixun-rsi-harness:0.16 describe
++FROM python:3.11-slim
++
++ARG RSI_RELEASE=0.16
++LABEL org.opencontainers.image.title="zhixun-rsi-harness" \
++      org.opencontainers.image.version="${RSI_RELEASE}" \
++      org.opencontainers.image.description="Contest 9 harness: offline continuation + drift-gated updates"
++
++ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
++ARG RSI_C_CALIBRATION=1
++ARG RSI_C_CAL_MODE=
++
++ENV PYTHONUNBUFFERED=1 \
++    PYTHONIOENCODING=utf-8 \
++    PYTHONDONTWRITEBYTECODE=1 \
++    PIP_NO_CACHE_DIR=1 \
++    PIP_DISABLE_PIP_VERSION_CHECK=1 \
++    CONTEST_APP=/app \
++    CONTEST_SUBMISSION=contest_submission \
++    PYTHONPATH=/app \
++    RSI_SWAN_MODE=disabled \
++    RSI_RELEASE=${RSI_RELEASE} \
++    RSI_C_CALIBRATION=${RSI_C_CALIBRATION} \
++    RSI_C_CAL_MODE=${RSI_C_CAL_MODE}
++
++# 1) SDK（官方 1.0.4，随平台下载包，不打网络补丁）
++COPY _sdk/contest-harness-sdk-1.0.4 /opt/contest-harness-sdk
++RUN pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" numpy \
++    && pip install --no-cache-dir /opt/contest-harness-sdk
++
++# 2) 我们自己的代码：官方基线副本 + 续训适配器 + 策略 + 入口
++COPY vendor /app/vendor
++COPY src /app/src
++COPY harness/harness.py /app/harness.py
++COPY harness/contest_submission.py /app/contest_submission.py
++
++# 构建时校验实际 COPY 后的代码与 SDK 导入，防止混合历史版本。
++COPY scripts/check_release.py /app/scripts/check_release.py
++COPY release_manifest.json /app/release_manifest.json
++RUN python3 /app/scripts/check_release.py --root /app --layout image --require-sdk
++
++# 3) 平台约定的挂载点（运行时不写 /app）
++RUN mkdir -p /app /data /previous /state /workspace && chmod 1777 /workspace /tmp
++
++WORKDIR /app
++USER 65534:65534
++
++ENTRYPOINT ["python3", "/app/harness.py"]
++CMD ["describe"]
+--- a/harness/contest_submission.py
++++ b/harness/contest_submission.py
+@@ -1,591 +1,591 @@
+-"""Contest harness entry: one round = read history -> measure -> decide -> act.
+-
+-Platform contract (SDK 1.0.4, protocol `contest.harness.workspace.v2`):
+-
+-    train(rnd)    called once per round
+-    predict(sample, model_dir)   called later, one sample per stdin line
+-
+-The v2 controller lives in `src/harness/round_controller.py`; this file is the
+-thin I/O shell: read the mount, call the model, pass the action through the
+-Gatekeeper, continue the parent checkpoint, and finish.
+-
+-Ordering rules that are easy to get wrong:
+-  1. training data only comes from the platform mount (/data) - nothing local;
+-  2. the model must be the parent checkpoint *continued* (weights + Adam + scalers);
+-  3. every round needs at least one real model call, or `finish` is rejected;
+-  4. any failure degrades to "keep the parent model" and still finishes the round;
+-  5. state saved this round is what the next round sees - keep it small and honest.
+-
+-Naming: variables are spelled out (`previous_state`, `candidate_dir`,
+-`round_result`) because this file is read more often than it is written.
+-"""
+-from __future__ import annotations
+-
+-import json
+-import os
+-import shutil
+-import sys
+-import time
+-from pathlib import Path
+-
+-import numpy as np
+-
+-PLATFORM_APP_DIR = Path(os.environ.get("CONTEST_APP", "/app"))
+-if str(PLATFORM_APP_DIR) not in sys.path:
+-    sys.path.insert(0, str(PLATFORM_APP_DIR))
+-
+-from src.harness.late_budget import (plan_c_budget, protect_c_attempt, pace_c_budget, execution_record)
+-from src.harness.guard import Gatekeeper  # noqa: E402
+-from src.harness.model_receipt import decide_with_receipt  # noqa: E402
+-from src.harness.round_controller import (  # noqa: E402
+-    acceptance,
+-    choose_budget,
+-    clip_regression_prediction,
+-    decision_record,
+-    feature_profile,
+-    js_divergence,
+-    metric_value,
+-    paired_acceptance,
+-    prediction_profile,
+-    psi_against,
+-    row_observation,
+-    score_gap,
+-    summarise_history,
+-)
+-from src.models.official_round import OfficialRound  # noqa: E402
+-from src.policy.whitelist import NONE_ACTION  # noqa: E402
+-from src.schema import Action, GateDecision  # noqa: E402
+-from src.utils.audit import AuditLog  # noqa: E402
+-from vendor.contest_baselines.data import flatten, read_dataset  # noqa: E402
+-from vendor.contest_baselines.model import Model  # noqa: E402
+-
+-SUPPORTED_TASKS = ("classification", "regression")
+-HARNESS_ENTRY = os.environ.get("CONTEST_HARNESS", str(PLATFORM_APP_DIR / "harness.py"))
+-PREDICT_COMMAND = [sys.executable, HARNESS_ENTRY, "predict"]
+-WORKSPACE = Path(os.environ.get("CONTEST_WORK", "/workspace"))
+-STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
+-EARLY_STOP_PATIENCE = 2
+-MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
+-# 版本号用于交付记录；预测策略仍随检查点保存。
+-RELEASE = os.environ.get("RSI_RELEASE", "0.15")
+-
+-
+-def calibration_enabled(release, override=None):
+-    """显式0/1优先；未指定时采用对应版本默认值。"""
+-    if override is None:
+-        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2", "0.14", "0.15")
+-    return override.strip().lower() not in ("0", "false", "no", "off", "")
+-
+-
+-def calibration_mode(release, override=None):
+-    """C 校准器模式：显式 RSI_C_CAL_MODE 优先，否则按 RELEASE 选择。"""
+-    if override is not None and override.strip():
+-        mode = override.strip().lower()
+-        if mode in ("v8", "spline_v2", "res_mlp_v1", "res_mlp_v2"):
+-            return mode
+-    if release == "0.9.1":
+-        return "spline_v2"
+-    if release == "0.9.2":
+-        return "res_mlp_v1"
+-    if release in ("0.14", "0.15"):
+-        return "res_mlp_v2"
+-    return "v8"
+-
+-
+-C_CALIBRATION_ENABLED = calibration_enabled(RELEASE, os.environ.get("RSI_C_CALIBRATION"))
+-C_CALIBRATION_MODE = calibration_mode(RELEASE, os.environ.get("RSI_C_CAL_MODE"))
+-STATE_SCHEMA = 3
+-
+-
+-def log_to_stderr(message: str) -> None:
+-    """stdout belongs to the protocol; human logs go to stderr."""
+-    print(f"[submission] {message}", file=sys.stderr, flush=True)
+-
+-
+-def truncate_utf8(text: str, limit: int = 3900) -> str:
+-    """Keep the protocol's 4000-*byte* limit even for Chinese text."""
+-    raw = (text or "").encode("utf-8")
+-    if len(raw) <= limit:
+-        return text or ""
+-    return raw[:limit].decode("utf-8", "ignore")
+-
+-
+-def read_previous_state() -> dict:
+-    """Native state saved by the previous round (/state is read-only)."""
+-    for name in ("harness_state.json", "state.json"):
+-        try:
+-            payload = json.loads((STATE_DIR / name).read_text(encoding="utf-8"))
+-        except Exception:
+-            continue
+-        if isinstance(payload, dict):
+-            return payload
+-    return {}
+-
+-
+-def find_parent_checkpoint(rnd, root=None) -> Path:
+-    """Locate the parent checkpoint without assuming its exact file name."""
+-    declared_paths = list(rnd.parent.declared_paths())
+-    numpy_files = [path for path in declared_paths if path.endswith(".npz")]
+-    preferred = [path for path in numpy_files if path.endswith("checkpoint.npz")]
+-    candidates = preferred or numpy_files
+-    if not candidates:
+-        raise FileNotFoundError(f"no .npz checkpoint among declared parent files: {declared_paths}")
+-    return rnd.parent.path(candidates[0], root=root)
+-
+-
+-def _metric_state(previous: dict, before: dict, task: str) -> dict:
+-    """Best/last values in native units, plus the gap the policy reacts to."""
+-    name, value, higher = metric_value(task, before)
+-    if previous:
+-        best = float(previous.get("best", value))
+-        last = float(value)
+-        best = max(best, last) if higher else min(best, last)
+-        baseline = float(previous.get("baseline", best))
+-    else:
+-        best = last = baseline = float(value)
+-    return {
+-        "metric": name,
+-        "higher_is_better": higher,
+-        "before": float(value),
+-        "best": float(best),
+-        "last": float(last),
+-        "baseline": float(baseline),
+-        "gap": score_gap(best, last, higher),
+-    }
+-
+-
+-def _model_prompt(payload: dict) -> str:
+-    return (
+-        "/no_think\n"
+-        "你是工业模型自进化系统的决策器。下面是一轮的真实状态（JSON）。\n"
+-        "请第一行直接输出唯一一行 JSON，不要思考过程，不要解释，不要 Markdown：\n"
+-        '{"decision":"train|hold","epochs":0-3,"lr":0.0005-0.003,"reason":"不超过60字"}\n'
+-        "规则：新阶段数据到达且有漂移时可 train；连续多轮无收益、或没有新数据且指标稳定时 hold；"
+-        "绝不建议超过规则预算的 epochs。\n"
+-        "状态：\n" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+-    )
+-
+-
+-def train(rnd) -> None:
+-    round_started_at = time.time()
+-    task_contract = rnd.task or {}
+-    task = task_contract.get("task", "classification")
+-    if task not in SUPPORTED_TASKS:
+-        raise ValueError(f"unsupported task {task!r}")
+-
+-    WORKSPACE.mkdir(parents=True, exist_ok=True)
+-    audit = AuditLog(WORKSPACE / f"audit-round-{rnd.round_index}.jsonl",
+-                     run=f"{rnd.dataset_key}-r{rnd.round_index}")
+-    previous_state = read_previous_state()
+-    platform_history = rnd.history()          # RPC: records of completed rounds
+-    history = summarise_history(platform_history, previous_state, task)
+-
+-    # --- 1. the parent model (always a declared file, never /app) ---------
+-    parent_root_override = os.environ.get("CONTEST_PARENT_ROOT") or None  # local rehearsal only
+-    parent_checkpoint = find_parent_checkpoint(rnd, root=parent_root_override)
+-    parent_model = Model.load(str(parent_checkpoint))
+-    class_names = list(parent_model.meta["classes"])
+-    feature_paths = list(parent_model.meta["paths"])
+-
+-    # --- 2. public data, schema-checked against the parent checkpoint -----
+-    training_dataset = read_dataset(rnd.data.train_path, task, class_names or None,
+-                                    expected_paths=feature_paths)
+-    validation_dataset = read_dataset(rnd.data.validation_path, task, class_names or None,
+-                                      expected_paths=feature_paths)
+-    train_rows = int(len(training_dataset["ids"]))
+-    validation_rows = int(len(validation_dataset["ids"]))
+-
+-    trainer = OfficialRound()
+-    validation_groups = (validation_dataset["groups"]
+-                         if rnd.dataset_key in ("B", "C") else None)
+-    validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
+-                                         validation_dataset["y"], groups=validation_groups)
+-    metric_state = _metric_state(previous_state, validation_before, task)
+-
+-    # --- 3. drift: against last stage, against round 1, and train vs val --
+-    previous_profile = previous_state.get("profile")
+-    baseline_profile = previous_state.get("baseline_profile") or previous_profile
+-    current_profile = feature_profile(training_dataset["x"])
+-    psi_prev = psi_against(previous_profile, training_dataset["x"])
+-    psi_baseline = psi_against(baseline_profile, training_dataset["x"])
+-    psi_holdout = psi_against(current_profile, validation_dataset["x"])
+-
+-    previous_predictions = parent_model.predict(validation_dataset["x"])
+-    prediction_now = prediction_profile(
+-        previous_predictions, task, class_names,
+-        reference_edges=(previous_state.get("pred_profile") or {}).get("edges"))
+-    previous_pred_shares = (previous_state.get("pred_profile") or {}).get("shares")
+-    pred_js = js_divergence(previous_pred_shares, prediction_now.get("shares")
+-                            if isinstance(prediction_now, dict) else None)
+-
+-    stage_id = str(getattr(rnd, "stage_id", "") or "")
+-    stage_changed = bool(stage_id) and stage_id != str(previous_state.get("stage_id", ""))
+-    if stage_changed:
+-        # Validation distributions differ across stages; an all-time best from
+-        # the previous stage is not comparable. Start the new stage's record at
+-        # the current parent, otherwise "best - current" looks like damage that
+-        # was never observed within this stage.
+-        metric_state["best"] = metric_state["before"]
+-        metric_state["gap"] = 0.0
+-    row_state = row_observation(previous_state, train_rows, validation_rows, int(rnd.round_index))
+-    data_grew = row_state["data_grew"]
+-    history["kill_switch"] = bool(previous_state.get("kill_switch"))
+-
+-    # --- 4. rule budget, then let the model narrow it ---------------------
+-    budget = choose_budget(
+-        dataset_key=str(rnd.dataset_key), task=task, round_index=int(rnd.round_index),
+-        psi_prev=psi_prev, psi_holdout=max(psi_holdout, psi_baseline if not previous_state else 0.0),
+-        data_grew=data_grew, stage_changed=stage_changed, gap=metric_state["gap"],
+-        history=history)
+-    late_policy = RELEASE == "0.15" and str(rnd.dataset_key) == "C"
+-    if late_policy:
+-        budget = plan_c_budget(budget, idle_rounds=int(previous_state.get("idle_rounds", 0)),
+-                               kill_switch=history["kill_switch"])
+-    model_state = {
+-        "round": rnd.round_index, "stage": stage_id, "dataset": rnd.dataset_key,
+-        "task": task, "metric": metric_state["metric"],
+-        "parent": round(metric_state["before"], 6),
+-        "best": round(metric_state["best"], 6),
+-        "gap": round(metric_state["gap"], 6),
+-        "rows": {"train": train_rows, "validation": validation_rows,
+-                 "train_grew": data_grew, "stage_changed": stage_changed},
+-        "drift": {"psi_vs_previous": round(psi_prev, 4),
+-                  "psi_vs_baseline": round(psi_baseline, 4),
+-                  "psi_train_vs_validation": round(psi_holdout, 4),
+-                  "prediction_js": round(pred_js, 4)},
+-        "history": history["recent"],
+-        "history_evidence": history["evidence"],
+-        "last_gain": history["last_gain"], "stalled": history["stalled"],
+-        "rule_budget": budget,
+-    }
+-    decision, model_text, model_diagnostics = decide_with_receipt(
+-        rnd, _model_prompt(model_state), budget, history, int(rnd.round_index))
+-    if late_policy:
+-        decision = protect_c_attempt(decision, budget)
+-    audit.write("model_receipt", step=int(rnd.round_index), **model_diagnostics)
+-    # The host may start with an older state. Recover its spent budget from the
+-    # platform's round records before assigning the next request.
+-    prior_spend = sum(int((r.get("configuration") or {}).get("epochs") or 0)
+-                      for r in (platform_history or []) if isinstance(r, dict))
+-    prior_spend = max(prior_spend, int(previous_state.get("requested_epochs_total", 0)))
+-    task_limit = {"A": 28, "B": 25, "C": 13}.get(str(rnd.dataset_key))
+-    if task_limit is not None and decision["epochs"] > max(0, task_limit - prior_spend):
+-        remaining = max(0, task_limit - prior_spend)
+-        decision.update(epochs=remaining, action="finetune" if remaining else "none",
+-                        rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
+-    if late_policy:
+-        decision = pace_c_budget(decision, spent=prior_spend, round_index=int(rnd.round_index))
+-    log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
+-                  f"stage_changed={stage_changed} rule={budget['rule']} "
+-                  f"model={decision.get('model_action')} source={decision['source']} "
+-                  f"model_status={model_diagnostics['status']} budget={decision['epochs']}ep")
+-
+-    # --- 5. controlled execution: kill-switch / whitelist / budget / bounds
+-    gate = Gatekeeper(
+-        cfg={"policy": {"max_retrains": MAX_UPDATES, "max_retrains_per_window": 0,
+-                        "amplitude_factor": 2.0, "max_consecutive_failures": 3}},
+-        audit=audit, root=WORKSPACE, executable=("none", "finetune"))
+-    old_kill = previous_state.get("kill_state") or {}
+-    gate.kill.consecutive_failures = int(old_kill.get("consecutive_failures", 0))
+-    gate.kill.total_failures = int(old_kill.get("total_failures", 0))
+-    if previous_state.get("kill_switch"):
+-        gate.kill.stopped = True
+-        gate.kill.reason = old_kill.get("reason") or "latched in a prior round"
+-    gate.limiter.last = dict(previous_state.get("bounds") or {})
+-    gate.budget.steps = [int(item) for item in (previous_state.get("budget_steps") or [])
+-                         if isinstance(item, (int, float))]
+-    if decision["epochs"] > 0:
+-        proposed = Action("finetune", {"epochs": int(decision["epochs"]),
+-                                       "lr": round(float(decision["lr"]), 6)},
+-                          est_cost=float(decision["epochs"]), est_gain=float(history["last_gain"]))
+-    else:
+-        proposed = NONE_ACTION
+-    gated = gate.review(GateDecision(True, decision["reason"], proposed),
+-                        step=int(rnd.round_index), retrains=int(previous_state.get("updates", 0)))
+-    if not gated.approved:
+-        log_to_stderr(f"gate rejected: {gated.reason}; keeping parent")
+-        decision.update(action="none", epochs=0, lr=0.0, rule="gate_reject",
+-                        source="gate",
+-                        reason=f"闸门拒绝：{gated.reason}；保持父模型")
+-    elif decision["epochs"] > 0:
+-        # the amplitude limiter may clip params; never let it *increase* epochs
+-        gated_epochs = int(gated.action.params.get("epochs", decision["epochs"]))
+-        decision["epochs"] = max(1, min(int(decision["epochs"]), gated_epochs))
+-        decision["lr"] = float(gated.action.params.get("lr", decision["lr"]))
+-
+-    # --- 6. continue the parent, then decide whether to submit -----------
+-    candidate_dir = WORKSPACE / f"candidate-round-{rnd.round_index}"
+-    shutil.rmtree(candidate_dir, ignore_errors=True)
+-    round_result = None
+-    training_error = ""
+-    outcome = None
+-    calibrate_c = (C_CALIBRATION_ENABLED and rnd.dataset_key == "C"
+-                   and task == "regression" and len(feature_paths) == 24)
+-    if int(decision["epochs"]) > 0:
+-        try:
+-            log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
+-                          f"calibrate_c={calibrate_c} mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
+-            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15")
+-            round_result = trainer.continue_round(
+-                parent_checkpoint,
+-                training_dataset["x"], training_dataset["y"],
+-                validation_dataset["x"], validation_dataset["y"],
+-                out_dir=candidate_dir,
+-                epochs=int(decision["epochs"]),
+-                learning_rate=float(decision["lr"]),
+-                patience=EARLY_STOP_PATIENCE,
+-                calibrate_c=calibrate_c,
+-                calibration_mode=C_CALIBRATION_MODE,
+-                selection_task=str(rnd.dataset_key) if use_paired else "",
+-                smooth_weights=True,
+-                validation_groups=validation_groups,
+-                stage_id=stage_id or f"round-{rnd.round_index}",
+-                hypothesis=decision["reason"],
+-                change_summary=json.dumps({"rule": decision["rule"],
+-                                           "signals": decision["signals"]},
+-                                          ensure_ascii=False))
+-            decide_promotion = paired_acceptance if use_paired else acceptance
+-            outcome = decide_promotion(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key))
+-            gate.commit(gated.action, step=int(rnd.round_index))
+-            gate.note_step_ok()
+-            audit.write("round_result", step=int(rnd.round_index), rule=decision["rule"],
+-                        epochs=decision["epochs"], outcome=outcome,
+-                        metrics_after=round_result.metrics_after)
+-        except Exception as exc:  # noqa: BLE001 - degradation is part of the contract
+-            gate.note_step_error(exc)
+-            training_error = f"{type(exc).__name__}: {exc}"
+-            log_to_stderr(f"training failed, keeping the parent model: {training_error}")
+-            shutil.rmtree(candidate_dir, ignore_errors=True)
+-            outcome = None
+-
+-    selected_artifact_id = rnd.parent.artifact_id
+-    promoted = bool(outcome and outcome.get("promote"))
+-    if promoted and round_result is not None:
+-        code_snapshot_dir = candidate_dir / "code"
+-        code_snapshot_dir.mkdir(exist_ok=True)
+-        for source_file in (Path(__file__), PLATFORM_APP_DIR / "src/policy/strategy.py",
+-                            PLATFORM_APP_DIR / "src/harness/round_controller.py",
+-                            PLATFORM_APP_DIR / "src/harness/model_receipt.py",
+-                            PLATFORM_APP_DIR / "src/models/official_round.py",
+-                            PLATFORM_APP_DIR / "vendor/contest_baselines/model.py",
+-                            PLATFORM_APP_DIR / "vendor/contest_baselines/data.py",
+-                            PLATFORM_APP_DIR / "vendor/contest_baselines/c_calibration.py"):
+-            if source_file.exists():
+-                shutil.copyfile(source_file, code_snapshot_dir / source_file.name)
+-        candidate_receipt = rnd.submit_candidate(
+-            candidate_dir,
+-            hypothesis=truncate_utf8(decision["reason"]),
+-            change_summary=(f"{decision['rule']}: epochs={decision['epochs']} lr={decision['lr']} "
+-                            f"before={round_result.metrics_before} after={round_result.metrics_after} "
+-                            f"gain={outcome['gain']}"),
+-            configuration={"rule": decision["rule"], "epochs": int(decision["epochs"]),
+-                           "lr": float(decision["lr"]), "psi_prev": round(psi_prev, 4),
+-                           "psi_holdout": round(psi_holdout, 4), "pred_js": round(pred_js, 4),
+-                           "history": history["recent"], "model_action": decision.get("model_action"),
+-                           "gain": outcome["gain"], "accepted": outcome["accepted"],
+-                           "calibrate_c": bool(round_result.config.get("calibrate_c")),
+-                           "promoted": True, "rows": train_rows},
+-            seed=int(parent_model.meta["seed"]),
+-            checkpoint_paths=["checkpoint.npz"],
+-            code_paths=[f"code/{path.name}" for path in code_snapshot_dir.iterdir()],
+-            predict_argv=PREDICT_COMMAND,
+-        )
+-        selected_artifact_id = candidate_receipt["artifact_id"]
+-    elif round_result is not None:
+-        log_to_stderr(f"candidate kept aside: before={round_result.metrics_before} "
+-                      f"after={round_result.metrics_after} outcome={outcome}")
+-
+-    # --- 7. hand compact, honest state to the next round ------------------
+-    final_metrics = round_result.metrics_after if promoted else validation_before
+-    final_metric_state = _metric_state(previous_state, final_metrics, task)
+-    if promoted:
+-        selected_value = float(metric_value(task, round_result.metrics_after)[1])
+-        best_value = (max(metric_state["best"], selected_value) if metric_state["higher_is_better"]
+-                      else min(metric_state["best"], selected_value))
+-    else:
+-        selected_value = metric_state["before"]
+-        best_value = metric_state["best"]
+-
+-    if promoted:
+-        stalled = 0
+-        last_gain = float(outcome["gain"])
+-        last_rejected = False
+-        promotions = int(previous_state.get("promotions", 0)) + 1
+-    elif int(decision["epochs"]) > 0:
+-        stalled = int(history["stalled"]) + 1
+-        last_gain = float(outcome["gain"]) if outcome else 0.0
+-        last_rejected = bool(outcome and not outcome.get("accepted"))
+-        promotions = int(previous_state.get("promotions", 0))
+-    else:
+-        stalled = int(history["stalled"])
+-        last_gain = float(history["last_gain"])
+-        last_rejected = bool(history.get("last_rejected", False))
+-        promotions = int(previous_state.get("promotions", 0))
+-
+-    # predictions of whatever model will serve the next round
+-    if promoted and round_result is not None:
+-        try:
+-            next_model = Model.load(str(round_result.checkpoint))
+-            next_profile = prediction_profile(
+-                next_model.predict(validation_dataset["x"]), task, class_names,
+-                reference_edges=(prediction_now or {}).get("edges") if isinstance(prediction_now, dict) else None)
+-        except Exception:  # noqa: BLE001
+-            next_profile = prediction_now
+-    else:
+-        next_profile = prediction_now
+-    if next_profile:
+-        next_profile["round"] = int(rnd.round_index)
+-        next_profile["model"] = "candidate" if promoted else "parent"
+-
+-    record = decision_record(
+-        round_index=int(rnd.round_index), stage_id=stage_id, dataset_key=str(rnd.dataset_key),
+-        action=decision, history=history,
+-        psi={"previous": round(psi_prev, 4), "baseline": round(psi_baseline, 4),
+-             "train_vs_validation": round(psi_holdout, 4), "prediction_js": round(pred_js, 4)},
+-        model_verdict=model_text, outcome=outcome, accepted=bool(outcome and outcome.get("accepted")),
+-        region="gate:" + ("approved" if gated.approved else gated.reason))
+-    execution = execution_record(decision, round_result, promoted, training_error)
+-    record["execution"] = execution
+-    audit.write("execution", step=int(rnd.round_index), **execution)
+-    records = list(previous_state.get("decisions") or [])[-9:] + [record]
+-
+-    next_state = {
+-        "schema": STATE_SCHEMA,
+-        "dataset": str(rnd.dataset_key),
+-        "task": task,
+-        "metric": final_metric_state["metric"],
+-        "direction": "higher" if final_metric_state["higher_is_better"] else "lower",
+-        "round": int(rnd.round_index),
+-        "stage_id": stage_id or str(previous_state.get("stage_id", "")),
+-        "n_train": train_rows,
+-        "idle_rounds": 0 if decision["epochs"] > 0 else int(previous_state.get("idle_rounds", 0)) + 1,
+-        "execution": execution,
+-        "requested_epochs_total": prior_spend + int(decision["epochs"]),
+-        "n_validation": validation_rows,
+-        **row_state,
+-        "release": RELEASE,
+-        "prediction_policy": "nonnegative_unbounded",
+-        "model_receipt": model_diagnostics,
+-        "validation_selected": final_metrics,
+-        "baseline": round(float(previous_state.get("baseline", metric_state["before"])), 6),
+-        "best": round(float(best_value), 6),
+-        "last": round(float(selected_value), 6),
+-        "last_gain": round(float(last_gain), 6),
+-        "stalled": int(stalled),
+-        "last_rejected": bool(last_rejected),
+-        "updates": int(previous_state.get("updates", 0)) + (1 if int(decision["epochs"]) > 0 else 0),
+-        "promotions": int(promotions),
+-        "profile": current_profile,
+-        "baseline_profile": baseline_profile or current_profile,
+-        "pred_profile": next_profile or previous_state.get("pred_profile"),
+-        "bounds": gate.limiter.as_dict(),
+-        "budget_steps": list(gate.budget.steps),
+-        "kill_switch": bool(gate.kill.tripped()),
+-        "kill_state": gate.kill.as_dict(),
+-        "audit": audit.as_dict(),
+-        "audit_events": list(audit.events[-20:]),
+-        "decisions": records,
+-        "clock_seconds": round(float(previous_state.get("clock_seconds", 0.0))
+-                               + time.time() - round_started_at, 2),
+-    }
+-    next_round_state_dir = WORKSPACE / f"state-round-{rnd.round_index}"
+-    shutil.rmtree(next_round_state_dir, ignore_errors=True)
+-    next_round_state_dir.mkdir(parents=True, exist_ok=True)
+-    (next_round_state_dir / "harness_state.json").write_text(
+-        json.dumps(next_state, ensure_ascii=False, indent=1, allow_nan=False), encoding="utf-8")
+-    (next_round_state_dir / "decisions.jsonl").write_text(
+-        "".join(json.dumps(item, ensure_ascii=False, allow_nan=False) + "\n" for item in records),
+-        encoding="utf-8")
+-    rnd.save_state(next_round_state_dir)
+-
+-    # --- 8. finish with a reason a human can audit -----------------------
+-    after_text = (f"{final_metric_state['metric']} {outcome['before']}→{outcome['after']} "
+-                  f"gain={outcome['gain']:+.4f}" if outcome else
+-                  f"{final_metric_state['metric']} 保持 {metric_state['before']:.4f}")
+-    reason = (
+-        f"第{rnd.round_index}轮（{stage_id or 'unknown-stage'}）：{decision['reason']}。"
+-        f"历史：{history['evidence']}。"
+-        f"漂移：PSI(上轮)={psi_prev:.3f} PSI(基线)={psi_baseline:.3f} PSI(训/验)={psi_holdout:.3f} "
+-        f"预测JS={pred_js:.3f}。"
+-        f"模型裁决：{decision.get('model_action')}"
+-        f"（{(decision.get('model_reason') or model_text or '无文本，按规则执行')[:120]}）。"
+-        f"结果：{after_text}；执行状态={execution['status']}；{'提交新候选' if promoted else '保持父模型'}"
+-        f"{'；训练异常=' + training_error if training_error else ''}。"
+-    )
+-    log_to_stderr(reason[:600])
+-    rnd.finish(
+-        selected_artifact_id=selected_artifact_id,
+-        hypothesis=truncate_utf8(decision["reason"]),
+-        change_summary=(f"action={decision['action']} epochs={decision['epochs']} "
+-                        f"lr={decision['lr']} rule={decision['rule']} "
+-                        f"promoted={promoted} outcome={outcome}"),
+-        reason=truncate_utf8(reason),
+-        configuration={"execution": execution, "rule": decision["rule"], "action": decision["action"],
+-                       "epochs": int(decision["epochs"]), "lr": float(decision["lr"]),
+-                       "psi_prev": round(psi_prev, 4), "psi_baseline": round(psi_baseline, 4),
+-                       "psi_holdout": round(psi_holdout, 4), "pred_js": round(pred_js, 4),
+-                       "rows": {"train": train_rows, "validation": validation_rows},
+-                       "stage_changed": stage_changed, "data_grew": data_grew,
+-                       "history": history["recent"], "model_action": decision.get("model_action"),
+-                       "source": decision["source"], "model_receipt": model_diagnostics,
+-                       "release": RELEASE, "prediction_policy": "nonnegative_unbounded",
+-                       **({"selection_audit": {
+-                           "validation_sha256": validation_dataset["sha256"],
+-                           "parent": {k: round_result.metrics_before[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_before},
+-                           "candidate": {k: round_result.metrics_after[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_after},
+-                           "smoothing": round_result.config["weight_smoothing"],
+-                           "component_cpu_seconds": round_result.config["component_cpu_seconds"],
+-                       }} if RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15") and round_result is not None else {}),
+-                       "accepted": bool(outcome and outcome.get("accepted")),
+-                       "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
+-                       "promoted": promoted, "gain": None if not outcome else outcome["gain"],
+-                       "gate": gated.approved},
+-        seed=int(parent_model.meta["seed"]),
+-        history_ids=list(rnd.history_ids)[:50],
+-        model_call_ids=list(rnd.call_ids),
+-    )
+-
+-
+-# --------------------------------------------------------------- predict
+-_LOADED_MODELS: dict[str, Model] = {}
+-
+-
+-def load_model_once(checkpoint_path: Path) -> Model:
+-    key = str(checkpoint_path)
+-    if key not in _LOADED_MODELS:
+-        _LOADED_MODELS[key] = Model.load(str(checkpoint_path))
+-    return _LOADED_MODELS[key]
+-
+-
+-def find_artifact_checkpoint(model_dir) -> Path:
+-    """The checkpoint the platform mounted for prediction.
+-
+-    `CONTEST_ARTIFACT_PATH` is authoritative; the directory scan is the fallback
+-    for a local run where that variable is not set.
+-    """
+-    from_env = os.environ.get("CONTEST_ARTIFACT_PATH")
+-    if from_env and Path(from_env).is_file():
+-        return Path(from_env)
+-    numpy_files = sorted(Path(model_dir).rglob("*.npz"))
+-    if not numpy_files:
+-        raise FileNotFoundError(f"no .npz found under {model_dir}")
+-    preferred = [path for path in numpy_files if path.name == "checkpoint.npz"]
+-    return (preferred or numpy_files)[0]
+-
+-
+-def predict(sample, model_dir):
+-    """Answer one sample. The platform reads one JSON line back before sending the next."""
+-    model = load_model_once(find_artifact_checkpoint(model_dir))
+-
+-    _, feature_values = flatten(sample.inputs)
+-    if len(feature_values) != len(model.meta["paths"]):
+-        raise ValueError("input schema mismatch: feature count does not match checkpoint")
+-
+-    output = model.predict(np.asarray([feature_values], dtype=float))
+-    if model.meta["task"] == "classification":
+-        class_scores = np.asarray(output)[0]
+-        best_index = int(np.argmax(class_scores))
+-        return [{"label": model.meta["classes"][best_index],
+-                 "score": float(class_scores[best_index])}]
+-    return {"value": clip_regression_prediction(
+-        float(np.asarray(output).reshape(-1)[0]), len(model.meta["paths"]))}
++"""Contest harness entry: one round = read history -> measure -> decide -> act.
++
++Platform contract (SDK 1.0.4, protocol `contest.harness.workspace.v2`):
++
++    train(rnd)    called once per round
++    predict(sample, model_dir)   called later, one sample per stdin line
++
++The v2 controller lives in `src/harness/round_controller.py`; this file is the
++thin I/O shell: read the mount, call the model, pass the action through the
++Gatekeeper, continue the parent checkpoint, and finish.
++
++Ordering rules that are easy to get wrong:
++  1. training data only comes from the platform mount (/data) - nothing local;
++  2. the model must be the parent checkpoint *continued* (weights + Adam + scalers);
++  3. every round needs at least one real model call, or `finish` is rejected;
++  4. any failure degrades to "keep the parent model" and still finishes the round;
++  5. state saved this round is what the next round sees - keep it small and honest.
++
++Naming: variables are spelled out (`previous_state`, `candidate_dir`,
++`round_result`) because this file is read more often than it is written.
++"""
++from __future__ import annotations
++
++import json
++import os
++import shutil
++import sys
++import time
++from pathlib import Path
++
++import numpy as np
++
++PLATFORM_APP_DIR = Path(os.environ.get("CONTEST_APP", "/app"))
++if str(PLATFORM_APP_DIR) not in sys.path:
++    sys.path.insert(0, str(PLATFORM_APP_DIR))
++
++from src.harness.late_budget import (plan_c_budget, protect_c_attempt, pace_c_budget, execution_record)
++from src.harness.guard import Gatekeeper  # noqa: E402
++from src.harness.model_receipt import decide_with_receipt  # noqa: E402
++from src.harness.round_controller import (  # noqa: E402
++    acceptance,
++    choose_budget,
++    clip_regression_prediction,
++    decision_record,
++    feature_profile,
++    js_divergence,
++    metric_value,
++    paired_acceptance,
++    prediction_profile,
++    psi_against,
++    row_observation,
++    score_gap,
++    summarise_history,
++)
++from src.models.official_round import OfficialRound  # noqa: E402
++from src.policy.whitelist import NONE_ACTION  # noqa: E402
++from src.schema import Action, GateDecision  # noqa: E402
++from src.utils.audit import AuditLog  # noqa: E402
++from vendor.contest_baselines.data import flatten, read_dataset  # noqa: E402
++from vendor.contest_baselines.model import Model  # noqa: E402
++
++SUPPORTED_TASKS = ("classification", "regression")
++HARNESS_ENTRY = os.environ.get("CONTEST_HARNESS", str(PLATFORM_APP_DIR / "harness.py"))
++PREDICT_COMMAND = [sys.executable, HARNESS_ENTRY, "predict"]
++WORKSPACE = Path(os.environ.get("CONTEST_WORK", "/workspace"))
++STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
++EARLY_STOP_PATIENCE = 2
++MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
++# 版本号用于交付记录；预测策略仍随检查点保存。
++RELEASE = os.environ.get("RSI_RELEASE", "0.16")
++
++
++def calibration_enabled(release, override=None):
++    """显式0/1优先；未指定时采用对应版本默认值。"""
++    if override is None:
++        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2", "0.14", "0.15", "0.16")
++    return override.strip().lower() not in ("0", "false", "no", "off", "")
++
++
++def calibration_mode(release, override=None):
++    """C 校准器模式：显式 RSI_C_CAL_MODE 优先，否则按 RELEASE 选择。"""
++    if override is not None and override.strip():
++        mode = override.strip().lower()
++        if mode in ("v8", "spline_v2", "res_mlp_v1", "res_mlp_v2"):
++            return mode
++    if release == "0.9.1":
++        return "spline_v2"
++    if release == "0.9.2":
++        return "res_mlp_v1"
++    if release in ("0.14", "0.15", "0.16"):
++        return "res_mlp_v2"
++    return "v8"
++
++
++C_CALIBRATION_ENABLED = calibration_enabled(RELEASE, os.environ.get("RSI_C_CALIBRATION"))
++C_CALIBRATION_MODE = calibration_mode(RELEASE, os.environ.get("RSI_C_CAL_MODE"))
++STATE_SCHEMA = 3
++
++
++def log_to_stderr(message: str) -> None:
++    """stdout belongs to the protocol; human logs go to stderr."""
++    print(f"[submission] {message}", file=sys.stderr, flush=True)
++
++
++def truncate_utf8(text: str, limit: int = 3900) -> str:
++    """Keep the protocol's 4000-*byte* limit even for Chinese text."""
++    raw = (text or "").encode("utf-8")
++    if len(raw) <= limit:
++        return text or ""
++    return raw[:limit].decode("utf-8", "ignore")
++
++
++def read_previous_state() -> dict:
++    """Native state saved by the previous round (/state is read-only)."""
++    for name in ("harness_state.json", "state.json"):
++        try:
++            payload = json.loads((STATE_DIR / name).read_text(encoding="utf-8"))
++        except Exception:
++            continue
++        if isinstance(payload, dict):
++            return payload
++    return {}
++
++
++def find_parent_checkpoint(rnd, root=None) -> Path:
++    """Locate the parent checkpoint without assuming its exact file name."""
++    declared_paths = list(rnd.parent.declared_paths())
++    numpy_files = [path for path in declared_paths if path.endswith(".npz")]
++    preferred = [path for path in numpy_files if path.endswith("checkpoint.npz")]
++    candidates = preferred or numpy_files
++    if not candidates:
++        raise FileNotFoundError(f"no .npz checkpoint among declared parent files: {declared_paths}")
++    return rnd.parent.path(candidates[0], root=root)
++
++
++def _metric_state(previous: dict, before: dict, task: str) -> dict:
++    """Best/last values in native units, plus the gap the policy reacts to."""
++    name, value, higher = metric_value(task, before)
++    if previous:
++        best = float(previous.get("best", value))
++        last = float(value)
++        best = max(best, last) if higher else min(best, last)
++        baseline = float(previous.get("baseline", best))
++    else:
++        best = last = baseline = float(value)
++    return {
++        "metric": name,
++        "higher_is_better": higher,
++        "before": float(value),
++        "best": float(best),
++        "last": float(last),
++        "baseline": float(baseline),
++        "gap": score_gap(best, last, higher),
++    }
++
++
++def _model_prompt(payload: dict) -> str:
++    return (
++        "/no_think\n"
++        "你是工业模型自进化系统的决策器。下面是一轮的真实状态（JSON）。\n"
++        "请第一行直接输出唯一一行 JSON，不要思考过程，不要解释，不要 Markdown：\n"
++        '{"decision":"train|hold","epochs":0-3,"lr":0.0005-0.003,"reason":"不超过60字"}\n'
++        "规则：新阶段数据到达且有漂移时可 train；连续多轮无收益、或没有新数据且指标稳定时 hold；"
++        "绝不建议超过规则预算的 epochs。\n"
++        "状态：\n" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
++    )
++
++
++def train(rnd) -> None:
++    round_started_at = time.time()
++    task_contract = rnd.task or {}
++    task = task_contract.get("task", "classification")
++    if task not in SUPPORTED_TASKS:
++        raise ValueError(f"unsupported task {task!r}")
++
++    WORKSPACE.mkdir(parents=True, exist_ok=True)
++    audit = AuditLog(WORKSPACE / f"audit-round-{rnd.round_index}.jsonl",
++                     run=f"{rnd.dataset_key}-r{rnd.round_index}")
++    previous_state = read_previous_state()
++    platform_history = rnd.history()          # RPC: records of completed rounds
++    history = summarise_history(platform_history, previous_state, task)
++
++    # --- 1. the parent model (always a declared file, never /app) ---------
++    parent_root_override = os.environ.get("CONTEST_PARENT_ROOT") or None  # local rehearsal only
++    parent_checkpoint = find_parent_checkpoint(rnd, root=parent_root_override)
++    parent_model = Model.load(str(parent_checkpoint))
++    class_names = list(parent_model.meta["classes"])
++    feature_paths = list(parent_model.meta["paths"])
++
++    # --- 2. public data, schema-checked against the parent checkpoint -----
++    training_dataset = read_dataset(rnd.data.train_path, task, class_names or None,
++                                    expected_paths=feature_paths)
++    validation_dataset = read_dataset(rnd.data.validation_path, task, class_names or None,
++                                      expected_paths=feature_paths)
++    train_rows = int(len(training_dataset["ids"]))
++    validation_rows = int(len(validation_dataset["ids"]))
++
++    trainer = OfficialRound()
++    validation_groups = (validation_dataset["groups"]
++                         if rnd.dataset_key in ("B", "C") else None)
++    validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
++                                         validation_dataset["y"], groups=validation_groups)
++    metric_state = _metric_state(previous_state, validation_before, task)
++
++    # --- 3. drift: against last stage, against round 1, and train vs val --
++    previous_profile = previous_state.get("profile")
++    baseline_profile = previous_state.get("baseline_profile") or previous_profile
++    current_profile = feature_profile(training_dataset["x"])
++    psi_prev = psi_against(previous_profile, training_dataset["x"])
++    psi_baseline = psi_against(baseline_profile, training_dataset["x"])
++    psi_holdout = psi_against(current_profile, validation_dataset["x"])
++
++    previous_predictions = parent_model.predict(validation_dataset["x"])
++    prediction_now = prediction_profile(
++        previous_predictions, task, class_names,
++        reference_edges=(previous_state.get("pred_profile") or {}).get("edges"))
++    previous_pred_shares = (previous_state.get("pred_profile") or {}).get("shares")
++    pred_js = js_divergence(previous_pred_shares, prediction_now.get("shares")
++                            if isinstance(prediction_now, dict) else None)
++
++    stage_id = str(getattr(rnd, "stage_id", "") or "")
++    stage_changed = bool(stage_id) and stage_id != str(previous_state.get("stage_id", ""))
++    if stage_changed:
++        # Validation distributions differ across stages; an all-time best from
++        # the previous stage is not comparable. Start the new stage's record at
++        # the current parent, otherwise "best - current" looks like damage that
++        # was never observed within this stage.
++        metric_state["best"] = metric_state["before"]
++        metric_state["gap"] = 0.0
++    row_state = row_observation(previous_state, train_rows, validation_rows, int(rnd.round_index))
++    data_grew = row_state["data_grew"]
++    history["kill_switch"] = bool(previous_state.get("kill_switch"))
++
++    # --- 4. rule budget, then let the model narrow it ---------------------
++    budget = choose_budget(
++        dataset_key=str(rnd.dataset_key), task=task, round_index=int(rnd.round_index),
++        psi_prev=psi_prev, psi_holdout=max(psi_holdout, psi_baseline if not previous_state else 0.0),
++        data_grew=data_grew, stage_changed=stage_changed, gap=metric_state["gap"],
++        history=history)
++    late_policy = RELEASE in ("0.15", "0.16") and str(rnd.dataset_key) == "C"
++    if late_policy:
++        budget = plan_c_budget(budget, idle_rounds=int(previous_state.get("idle_rounds", 0)),
++                               kill_switch=history["kill_switch"])
++    model_state = {
++        "round": rnd.round_index, "stage": stage_id, "dataset": rnd.dataset_key,
++        "task": task, "metric": metric_state["metric"],
++        "parent": round(metric_state["before"], 6),
++        "best": round(metric_state["best"], 6),
++        "gap": round(metric_state["gap"], 6),
++        "rows": {"train": train_rows, "validation": validation_rows,
++                 "train_grew": data_grew, "stage_changed": stage_changed},
++        "drift": {"psi_vs_previous": round(psi_prev, 4),
++                  "psi_vs_baseline": round(psi_baseline, 4),
++                  "psi_train_vs_validation": round(psi_holdout, 4),
++                  "prediction_js": round(pred_js, 4)},
++        "history": history["recent"],
++        "history_evidence": history["evidence"],
++        "last_gain": history["last_gain"], "stalled": history["stalled"],
++        "rule_budget": budget,
++    }
++    decision, model_text, model_diagnostics = decide_with_receipt(
++        rnd, _model_prompt(model_state), budget, history, int(rnd.round_index))
++    if late_policy:
++        decision = protect_c_attempt(decision, budget)
++    audit.write("model_receipt", step=int(rnd.round_index), **model_diagnostics)
++    # The host may start with an older state. Recover its spent budget from the
++    # platform's round records before assigning the next request.
++    prior_spend = sum(int((r.get("configuration") or {}).get("epochs") or 0)
++                      for r in (platform_history or []) if isinstance(r, dict))
++    prior_spend = max(prior_spend, int(previous_state.get("requested_epochs_total", 0)))
++    task_limit = {"A": 28, "B": 25, "C": 13}.get(str(rnd.dataset_key))
++    if task_limit is not None and decision["epochs"] > max(0, task_limit - prior_spend):
++        remaining = max(0, task_limit - prior_spend)
++        decision.update(epochs=remaining, action="finetune" if remaining else "none",
++                        rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
++    if late_policy:
++        decision = pace_c_budget(decision, spent=prior_spend, round_index=int(rnd.round_index))
++    log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
++                  f"stage_changed={stage_changed} rule={budget['rule']} "
++                  f"model={decision.get('model_action')} source={decision['source']} "
++                  f"model_status={model_diagnostics['status']} budget={decision['epochs']}ep")
++
++    # --- 5. controlled execution: kill-switch / whitelist / budget / bounds
++    gate = Gatekeeper(
++        cfg={"policy": {"max_retrains": MAX_UPDATES, "max_retrains_per_window": 0,
++                        "amplitude_factor": 2.0, "max_consecutive_failures": 3}},
++        audit=audit, root=WORKSPACE, executable=("none", "finetune"))
++    old_kill = previous_state.get("kill_state") or {}
++    gate.kill.consecutive_failures = int(old_kill.get("consecutive_failures", 0))
++    gate.kill.total_failures = int(old_kill.get("total_failures", 0))
++    if previous_state.get("kill_switch"):
++        gate.kill.stopped = True
++        gate.kill.reason = old_kill.get("reason") or "latched in a prior round"
++    gate.limiter.last = dict(previous_state.get("bounds") or {})
++    gate.budget.steps = [int(item) for item in (previous_state.get("budget_steps") or [])
++                         if isinstance(item, (int, float))]
++    if decision["epochs"] > 0:
++        proposed = Action("finetune", {"epochs": int(decision["epochs"]),
++                                       "lr": round(float(decision["lr"]), 6)},
++                          est_cost=float(decision["epochs"]), est_gain=float(history["last_gain"]))
++    else:
++        proposed = NONE_ACTION
++    gated = gate.review(GateDecision(True, decision["reason"], proposed),
++                        step=int(rnd.round_index), retrains=int(previous_state.get("updates", 0)))
++    if not gated.approved:
++        log_to_stderr(f"gate rejected: {gated.reason}; keeping parent")
++        decision.update(action="none", epochs=0, lr=0.0, rule="gate_reject",
++                        source="gate",
++                        reason=f"闸门拒绝：{gated.reason}；保持父模型")
++    elif decision["epochs"] > 0:
++        # the amplitude limiter may clip params; never let it *increase* epochs
++        gated_epochs = int(gated.action.params.get("epochs", decision["epochs"]))
++        decision["epochs"] = max(1, min(int(decision["epochs"]), gated_epochs))
++        decision["lr"] = float(gated.action.params.get("lr", decision["lr"]))
++
++    # --- 6. continue the parent, then decide whether to submit -----------
++    candidate_dir = WORKSPACE / f"candidate-round-{rnd.round_index}"
++    shutil.rmtree(candidate_dir, ignore_errors=True)
++    round_result = None
++    training_error = ""
++    outcome = None
++    calibrate_c = (C_CALIBRATION_ENABLED and rnd.dataset_key == "C"
++                   and task == "regression" and len(feature_paths) == 24)
++    if int(decision["epochs"]) > 0:
++        try:
++            log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
++                          f"calibrate_c={calibrate_c} mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
++            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15", "0.16")
++            round_result = trainer.continue_round(
++                parent_checkpoint,
++                training_dataset["x"], training_dataset["y"],
++                validation_dataset["x"], validation_dataset["y"],
++                out_dir=candidate_dir,
++                epochs=int(decision["epochs"]),
++                learning_rate=float(decision["lr"]),
++                patience=EARLY_STOP_PATIENCE,
++                calibrate_c=calibrate_c,
++                calibration_mode=C_CALIBRATION_MODE,
++                selection_task=str(rnd.dataset_key) if use_paired else "",
++                smooth_weights=True,
++                validation_groups=validation_groups,
++                stage_id=stage_id or f"round-{rnd.round_index}",
++                hypothesis=decision["reason"],
++                change_summary=json.dumps({"rule": decision["rule"],
++                                           "signals": decision["signals"]},
++                                          ensure_ascii=False))
++            decide_promotion = paired_acceptance if use_paired else acceptance
++            outcome = decide_promotion(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key))
++            gate.commit(gated.action, step=int(rnd.round_index))
++            gate.note_step_ok()
++            audit.write("round_result", step=int(rnd.round_index), rule=decision["rule"],
++                        epochs=decision["epochs"], outcome=outcome,
++                        metrics_after=round_result.metrics_after)
++        except Exception as exc:  # noqa: BLE001 - degradation is part of the contract
++            gate.note_step_error(exc)
++            training_error = f"{type(exc).__name__}: {exc}"
++            log_to_stderr(f"training failed, keeping the parent model: {training_error}")
++            shutil.rmtree(candidate_dir, ignore_errors=True)
++            outcome = None
++
++    selected_artifact_id = rnd.parent.artifact_id
++    promoted = bool(outcome and outcome.get("promote"))
++    if promoted and round_result is not None:
++        code_snapshot_dir = candidate_dir / "code"
++        code_snapshot_dir.mkdir(exist_ok=True)
++        for source_file in (Path(__file__), PLATFORM_APP_DIR / "src/policy/strategy.py",
++                            PLATFORM_APP_DIR / "src/harness/round_controller.py",
++                            PLATFORM_APP_DIR / "src/harness/model_receipt.py",
++                            PLATFORM_APP_DIR / "src/models/official_round.py",
++                            PLATFORM_APP_DIR / "vendor/contest_baselines/model.py",
++                            PLATFORM_APP_DIR / "vendor/contest_baselines/data.py",
++                            PLATFORM_APP_DIR / "vendor/contest_baselines/c_calibration.py"):
++            if source_file.exists():
++                shutil.copyfile(source_file, code_snapshot_dir / source_file.name)
++        candidate_receipt = rnd.submit_candidate(
++            candidate_dir,
++            hypothesis=truncate_utf8(decision["reason"]),
++            change_summary=(f"{decision['rule']}: epochs={decision['epochs']} lr={decision['lr']} "
++                            f"before={round_result.metrics_before} after={round_result.metrics_after} "
++                            f"gain={outcome['gain']}"),
++            configuration={"rule": decision["rule"], "epochs": int(decision["epochs"]),
++                           "lr": float(decision["lr"]), "psi_prev": round(psi_prev, 4),
++                           "psi_holdout": round(psi_holdout, 4), "pred_js": round(pred_js, 4),
++                           "history": history["recent"], "model_action": decision.get("model_action"),
++                           "gain": outcome["gain"], "accepted": outcome["accepted"],
++                           "calibrate_c": bool(round_result.config.get("calibrate_c")),
++                           "promoted": True, "rows": train_rows},
++            seed=int(parent_model.meta["seed"]),
++            checkpoint_paths=["checkpoint.npz"],
++            code_paths=[f"code/{path.name}" for path in code_snapshot_dir.iterdir()],
++            predict_argv=PREDICT_COMMAND,
++        )
++        selected_artifact_id = candidate_receipt["artifact_id"]
++    elif round_result is not None:
++        log_to_stderr(f"candidate kept aside: before={round_result.metrics_before} "
++                      f"after={round_result.metrics_after} outcome={outcome}")
++
++    # --- 7. hand compact, honest state to the next round ------------------
++    final_metrics = round_result.metrics_after if promoted else validation_before
++    final_metric_state = _metric_state(previous_state, final_metrics, task)
++    if promoted:
++        selected_value = float(metric_value(task, round_result.metrics_after)[1])
++        best_value = (max(metric_state["best"], selected_value) if metric_state["higher_is_better"]
++                      else min(metric_state["best"], selected_value))
++    else:
++        selected_value = metric_state["before"]
++        best_value = metric_state["best"]
++
++    if promoted:
++        stalled = 0
++        last_gain = float(outcome["gain"])
++        last_rejected = False
++        promotions = int(previous_state.get("promotions", 0)) + 1
++    elif int(decision["epochs"]) > 0:
++        stalled = int(history["stalled"]) + 1
++        last_gain = float(outcome["gain"]) if outcome else 0.0
++        last_rejected = bool(outcome and not outcome.get("accepted"))
++        promotions = int(previous_state.get("promotions", 0))
++    else:
++        stalled = int(history["stalled"])
++        last_gain = float(history["last_gain"])
++        last_rejected = bool(history.get("last_rejected", False))
++        promotions = int(previous_state.get("promotions", 0))
++
++    # predictions of whatever model will serve the next round
++    if promoted and round_result is not None:
++        try:
++            next_model = Model.load(str(round_result.checkpoint))
++            next_profile = prediction_profile(
++                next_model.predict(validation_dataset["x"]), task, class_names,
++                reference_edges=(prediction_now or {}).get("edges") if isinstance(prediction_now, dict) else None)
++        except Exception:  # noqa: BLE001
++            next_profile = prediction_now
++    else:
++        next_profile = prediction_now
++    if next_profile:
++        next_profile["round"] = int(rnd.round_index)
++        next_profile["model"] = "candidate" if promoted else "parent"
++
++    record = decision_record(
++        round_index=int(rnd.round_index), stage_id=stage_id, dataset_key=str(rnd.dataset_key),
++        action=decision, history=history,
++        psi={"previous": round(psi_prev, 4), "baseline": round(psi_baseline, 4),
++             "train_vs_validation": round(psi_holdout, 4), "prediction_js": round(pred_js, 4)},
++        model_verdict=model_text, outcome=outcome, accepted=bool(outcome and outcome.get("accepted")),
++        region="gate:" + ("approved" if gated.approved else gated.reason))
++    execution = execution_record(decision, round_result, promoted, training_error)
++    record["execution"] = execution
++    audit.write("execution", step=int(rnd.round_index), **execution)
++    records = list(previous_state.get("decisions") or [])[-9:] + [record]
++
++    next_state = {
++        "schema": STATE_SCHEMA,
++        "dataset": str(rnd.dataset_key),
++        "task": task,
++        "metric": final_metric_state["metric"],
++        "direction": "higher" if final_metric_state["higher_is_better"] else "lower",
++        "round": int(rnd.round_index),
++        "stage_id": stage_id or str(previous_state.get("stage_id", "")),
++        "n_train": train_rows,
++        "idle_rounds": 0 if decision["epochs"] > 0 else int(previous_state.get("idle_rounds", 0)) + 1,
++        "execution": execution,
++        "requested_epochs_total": prior_spend + int(decision["epochs"]),
++        "n_validation": validation_rows,
++        **row_state,
++        "release": RELEASE,
++        "prediction_policy": "nonnegative_unbounded",
++        "model_receipt": model_diagnostics,
++        "validation_selected": final_metrics,
++        "baseline": round(float(previous_state.get("baseline", metric_state["before"])), 6),
++        "best": round(float(best_value), 6),
++        "last": round(float(selected_value), 6),
++        "last_gain": round(float(last_gain), 6),
++        "stalled": int(stalled),
++        "last_rejected": bool(last_rejected),
++        "updates": int(previous_state.get("updates", 0)) + (1 if int(decision["epochs"]) > 0 else 0),
++        "promotions": int(promotions),
++        "profile": current_profile,
++        "baseline_profile": baseline_profile or current_profile,
++        "pred_profile": next_profile or previous_state.get("pred_profile"),
++        "bounds": gate.limiter.as_dict(),
++        "budget_steps": list(gate.budget.steps),
++        "kill_switch": bool(gate.kill.tripped()),
++        "kill_state": gate.kill.as_dict(),
++        "audit": audit.as_dict(),
++        "audit_events": list(audit.events[-20:]),
++        "decisions": records,
++        "clock_seconds": round(float(previous_state.get("clock_seconds", 0.0))
++                               + time.time() - round_started_at, 2),
++    }
++    next_round_state_dir = WORKSPACE / f"state-round-{rnd.round_index}"
++    shutil.rmtree(next_round_state_dir, ignore_errors=True)
++    next_round_state_dir.mkdir(parents=True, exist_ok=True)
++    (next_round_state_dir / "harness_state.json").write_text(
++        json.dumps(next_state, ensure_ascii=False, indent=1, allow_nan=False), encoding="utf-8")
++    (next_round_state_dir / "decisions.jsonl").write_text(
++        "".join(json.dumps(item, ensure_ascii=False, allow_nan=False) + "\n" for item in records),
++        encoding="utf-8")
++    rnd.save_state(next_round_state_dir)
++
++    # --- 8. finish with a reason a human can audit -----------------------
++    after_text = (f"{final_metric_state['metric']} {outcome['before']}→{outcome['after']} "
++                  f"gain={outcome['gain']:+.4f}" if outcome else
++                  f"{final_metric_state['metric']} 保持 {metric_state['before']:.4f}")
++    reason = (
++        f"第{rnd.round_index}轮（{stage_id or 'unknown-stage'}）：{decision['reason']}。"
++        f"历史：{history['evidence']}。"
++        f"漂移：PSI(上轮)={psi_prev:.3f} PSI(基线)={psi_baseline:.3f} PSI(训/验)={psi_holdout:.3f} "
++        f"预测JS={pred_js:.3f}。"
++        f"模型裁决：{decision.get('model_action')}"
++        f"（{(decision.get('model_reason') or model_text or '无文本，按规则执行')[:120]}）。"
++        f"结果：{after_text}；执行状态={execution['status']}；{'提交新候选' if promoted else '保持父模型'}"
++        f"{'；训练异常=' + training_error if training_error else ''}。"
++    )
++    log_to_stderr(reason[:600])
++    rnd.finish(
++        selected_artifact_id=selected_artifact_id,
++        hypothesis=truncate_utf8(decision["reason"]),
++        change_summary=(f"action={decision['action']} epochs={decision['epochs']} "
++                        f"lr={decision['lr']} rule={decision['rule']} "
++                        f"promoted={promoted} outcome={outcome}"),
++        reason=truncate_utf8(reason),
++        configuration={"execution": execution, "rule": decision["rule"], "action": decision["action"],
++                       "epochs": int(decision["epochs"]), "lr": float(decision["lr"]),
++                       "psi_prev": round(psi_prev, 4), "psi_baseline": round(psi_baseline, 4),
++                       "psi_holdout": round(psi_holdout, 4), "pred_js": round(pred_js, 4),
++                       "rows": {"train": train_rows, "validation": validation_rows},
++                       "stage_changed": stage_changed, "data_grew": data_grew,
++                       "history": history["recent"], "model_action": decision.get("model_action"),
++                       "source": decision["source"], "model_receipt": model_diagnostics,
++                       "release": RELEASE, "prediction_policy": "nonnegative_unbounded",
++                       **({"selection_audit": {
++                           "validation_sha256": validation_dataset["sha256"],
++                           "parent": {k: round_result.metrics_before[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_before},
++                           "candidate": {k: round_result.metrics_after[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_after},
++                           "smoothing": round_result.config["weight_smoothing"],
++                           "component_cpu_seconds": round_result.config["component_cpu_seconds"],
++                       }} if RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15", "0.16") and round_result is not None else {}),
++                       "accepted": bool(outcome and outcome.get("accepted")),
++                       "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
++                       "promoted": promoted, "gain": None if not outcome else outcome["gain"],
++                       "gate": gated.approved},
++        seed=int(parent_model.meta["seed"]),
++        history_ids=list(rnd.history_ids)[:50],
++        model_call_ids=list(rnd.call_ids),
++    )
++
++
++# --------------------------------------------------------------- predict
++_LOADED_MODELS: dict[str, Model] = {}
++
++
++def load_model_once(checkpoint_path: Path) -> Model:
++    key = str(checkpoint_path)
++    if key not in _LOADED_MODELS:
++        _LOADED_MODELS[key] = Model.load(str(checkpoint_path))
++    return _LOADED_MODELS[key]
++
++
++def find_artifact_checkpoint(model_dir) -> Path:
++    """The checkpoint the platform mounted for prediction.
++
++    `CONTEST_ARTIFACT_PATH` is authoritative; the directory scan is the fallback
++    for a local run where that variable is not set.
++    """
++    from_env = os.environ.get("CONTEST_ARTIFACT_PATH")
++    if from_env and Path(from_env).is_file():
++        return Path(from_env)
++    numpy_files = sorted(Path(model_dir).rglob("*.npz"))
++    if not numpy_files:
++        raise FileNotFoundError(f"no .npz found under {model_dir}")
++    preferred = [path for path in numpy_files if path.name == "checkpoint.npz"]
++    return (preferred or numpy_files)[0]
++
++
++def predict(sample, model_dir):
++    """Answer one sample. The platform reads one JSON line back before sending the next."""
++    model = load_model_once(find_artifact_checkpoint(model_dir))
++
++    _, feature_values = flatten(sample.inputs)
++    if len(feature_values) != len(model.meta["paths"]):
++        raise ValueError("input schema mismatch: feature count does not match checkpoint")
++
++    output = model.predict(np.asarray([feature_values], dtype=float))
++    if model.meta["task"] == "classification":
++        class_scores = np.asarray(output)[0]
++        best_index = int(np.argmax(class_scores))
++        return [{"label": model.meta["classes"][best_index],
++                 "score": float(class_scores[best_index])}]
++    return {"value": clip_regression_prediction(
++        float(np.asarray(output).reshape(-1)[0]), len(model.meta["paths"]))}
+--- /dev/null
++++ b/release_manifest.json
+@@ -0,0 +1,42 @@
++{
++  "schema": 1,
++  "release": "0.16",
++  "runtime_sha256": {
++    "harness/contest_submission.py": "bc1d4542d0798e8f4a712caf6d9943d8c17bb4594d36106cedd3994d09734c2b",
++    "harness/harness.py": "b7e30262f8a0c4195e1c1129bbe9def362580285be2c387d05cb6343728365ef",
++    "scripts/check_release.py": "392f8a6bbd8340faf5ea0b12114d8c3f50c594b150f4cc4e72ade504510f74d2",
++    "src/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++    "src/eval/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++    "src/eval/cost.py": "a2b40f944dd2c9e0a26e47ab91e1d1fe5ac589a30ca1c264b6cfd083d53fea6d",
++    "src/eval/metrics.py": "048b5116e209b2b70599a52743997d6bb2d76f3a51513c5089caa1739312cbdf",
++    "src/harness/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++    "src/harness/guard.py": "d974169da40e8b10e1f7c601a1d7243497f1a982c64d7d1010650cd0202b8291",
++    "src/harness/killswitch.py": "260fcaa3adffde36f8e0a5e595c834b069af9f16a4fc060711a98a4526355fda",
++    "src/harness/late_budget.py": "129a35ebee2201156ede99bc376eba7e89e37f318764b659a053915aa2fbb774",
++    "src/harness/loop.py": "8391b5ea436546ad08ab749eb2bb1cf80319cbb62baea6a7ce207d0b8716a1a5",
++    "src/harness/model_receipt.py": "04f6bf8829cf826ba1592df8787b80fbe26bfafc79b510f66a1dc8562974803d",
++    "src/harness/round_controller.py": "88c8fcf5db4ce9d6a2614872a2e4ac9da3dacca66606dd1814670e5bfb7f8998",
++    "src/models/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++    "src/models/baseline.py": "4592cae2338e60c688864a9ed31eb41555888aff3b76b462356fca4b8c59a993",
++    "src/models/official_round.py": "b78dee55052d64eeee833e6f34e94903b18195dc10e1edadd3c852c72e57e894",
++    "src/monitor/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++    "src/monitor/drift.py": "867108d6352647b3f0afd0abbf173f95197f5e1d43ed292ad74c31a89ae5c98f",
++    "src/policy/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++    "src/policy/bounds.py": "de1c7567a4517e7dd04b19652a5a390af65b8d389c9c98347e7219c5907ff4be",
++    "src/policy/budget.py": "77a05cc339e32d46c7bdaaceba03f09b7777fed5843a276187d333d94fabfb43",
++    "src/policy/policies.py": "fe56973ec4d56809abe1234a20bedcf4f4993d5d3658f7883cc30517806521ec",
++    "src/policy/strategy.py": "124bd533527609b3cb26562835e7370235de720fc1cf3f837a0d629eab9b5810",
++    "src/policy/whitelist.py": "1719b8e7f9f74a426b58a402e9ab4e44f1e74d71bbddcb047f7604d6777baa97",
++    "src/schema.py": "ca709f417bf6cd236f47221a70c79b5d2117abccd0f290692e62e73a7f8670d2",
++    "src/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
++    "src/utils/audit.py": "89733794baebc4e7ba37eba48cdc4d6832a12910172dd826137b81002a9610e2",
++    "src/utils/swan.py": "fb34763de66c5137bec335e4d9afa8bfad842ee2620b8d2d646d624d35b4f072",
++    "vendor/contest_baselines/__init__.py": "5b190e4342af0285c05c245da09d3c80ff26a3bd4f19997f1f543ad6c8fb7df2",
++    "vendor/contest_baselines/c_calibration.py": "a1a66a2bfc20dcfcd38de90811b472dcb4f045b69178ea932a9f599fd36f9c26",
++    "vendor/contest_baselines/data.py": "526b9085e62c7de88f3e24a4bcf6d8de332baf5cb914078a8f2816a25eb87e3b",
++    "vendor/contest_baselines/model.py": "59833cc4c65771da72756a3ac69a53accb7a9f8e18cbe04a8589263ae38938bd",
++    "vendor/contest_baselines/predict.py": "d7f7564dc788b55961a075dd22f41d94da8f0d472d402a9b2f8f340826d36222",
++    "vendor/contest_baselines/train.py": "0590c753476ec508c0cd494810f9e5bf753a3c90104110bd8be30ff44f36c515"
++  },
++  "purpose": "detect mixed or incomplete releases; not a cryptographic signature"
++}
+--- /dev/null
++++ b/reports/v16_构建与验收.md
+@@ -0,0 +1,17 @@
++# v16 构建与验收
++
++当前只交付源码，未生成镜像 tar 或 digest；不提供估算值作为实测体积。以下步骤在具备 Docker daemon 与官方 SDK 的环境执行。
++
++```powershell
++py -3.12 scripts/check_release.py --root .
++py -3.12 -m unittest discover -s tests -v
++# 从平台获取官方 SDK，放到 _sdk/contest-harness-sdk-1.0.4
++docker build --platform linux/amd64 --build-arg RSI_RELEASE=0.16 -f harness.Dockerfile -t zhixun-rsi-harness:0.16 .
++docker run --rm --network none zhixun-rsi-harness:0.16 describe
++# 继续按官方 SDK 宿主完成 train/predict/finish 及实际检查点断网测试
++docker save -o zhixun-rsi-harness-0.16.tar zhixun-rsi-harness:0.16
++Get-FileHash zhixun-rsi-harness-0.16.tar -Algorithm SHA256
++```
++
++构建内置的预检检查代码完整性与 SDK CLI 导入，不能保证平台协议全流程。源码与镜像默认都是 0.16，不要只改网页版本名。
++镜像体积、网盘链接、SHA-256 均需构建后据实填写；本文不启动构建、上传或评测。云端实验链接沿用历史记录时必须标注其真实版本；未建立新的 v16 训练记录。
+--- /dev/null
++++ b/reports/v16_比较与交付.md
+@@ -0,0 +1,79 @@
++# 两份 v15 的比较与 v16 交付
++
++2026-11-25。本次仅做本地比较、修复、测试与源码交付，未构建镜像、未上传或调用平台评测。
++
++## 结论
++
++采用我们可运行的 v15 策略和完整算法实现，吸收队友材料的目录整理与源码说明思路，形成 v16 发布一致性修复版。没有足够证据把队友源码包视作更优模型，也没有增加未经验证的新训练损失或调参。v16 不是新增隐藏集成绩。
++
++两份输入分开定义：我方 v15 为上次 outputs/v15 源码包；队友 v15 为用户提供“提交材料_v15/07-项目源代码.zip”。原始材料只读。比较依据是压缩包内实际文件，而非文件名或历史测试日志。
++
++## 优劣对照
++
++| 项 | 我方 v15 | 队友 v15 的实际源码 | v16 选择 |
++|---|---|---|---|
++| 交付结构 | 源码、补丁、日志分开；带有历史提交材料，体积偏大 | 七项提交材料、SOURCE_README 和组件清单较清楚，去掉嵌套旧提交包 | 保留清楚的源码说明与精简目录，不复制旧 PDF/PPT 的版本和成绩声明 |
++| 平台入口 | 可导入，包含 late_budget | 入口与我方 v15 字节相同，但 late_budget.py 缺失；直接导入 ModuleNotFoundError | 恢复完整模块，加入实际解压产物校验 |
++| 训练接口 | 支持 calibration_mode/selection_task/smooth_weights | 旧 OfficialRound 缺这些参数；只补 late_budget 仍不足以工作 | 保留完整训练接口及配对快照选择 |
++| C 校准 | res_mlp_v2，支持多版本检查点、双向尾部修正 | 旧 spline，修正限制 ±10；无 res_mlp_v2 分派 | 保留 v14/v15 校准器，不合并旧实现 |
++| 选模/预算 | NASA 门控、后期预留、有限探针、分项审计 | 旧控制器无 paired_acceptance/NASA 保护；C 新阶段探针为 1 epoch | 保留可运行 v15 规则；预算仍为 13 |
++| 镜像默认值 | 0.15 | Dockerfile 实际默认 0.7.1，与提交说明 0.15 不一致 | 源码及 Docker 默认均为 0.16，构建内置预检 |
++| 测试证据 | 当前运行 85 项通过 | 压缩包内实际运行 33 项，1 个导入错误；附带 tests.log 与我方旧日志相同 | 92 项通过，并在最终 ZIP 解压目录重新运行 |
++
++这些现象说明交付包存在历史模块混合，而不是证明队友原始工作区或训练实验错误。若其工作区另有优化源码，需另行提供；本版没有猜测或重建未提供的修改。
++
++## 实际复现的故障
++
++1. 原包设置 PYTHONPATH=harness 后 import contest_submission，错误为 `ModuleNotFoundError: src.harness.late_budget`。
++2. 入口导入 paired_acceptance，但旧 round_controller 不提供；旧 trainer 也不接受入口传入的新版参数。补一个文件不能解决模块契约问题。
++3. 将我们上一版选中的 C 检查点交给队友包的 Model.predict，在同一公开验证集 23049 行上，旧校准器直接调用抛 KeyError，Model.predict 捕获后悄然退回未经校准的 MLP：RMSE=51.846267，NASA=3.496776468e9。完整 v15/v16 对同一检查点为 RMSE=46.674885、NASA=7.674401416e8。
++
++第 3 项仅是同一已有检查点的推理兼容性测试，不能写成“队友重新训练的 v15 成绩”。队友包当前无法启动，不能公平地执行完整训练性能或成本对比；“旧校准器更省 CPU”也尚未测量。
++
++## v16 的具体修改
++
++- 入口及镜像默认 0.16，沿用可运行 v15 的 C 调度，仍为 res_mlp_v2；A/B 决策、MLP/Adam/标准化、NASA 门禁和 13 epoch 上限不变。C 核心校准器、训练器及控制器均逐字节保留。
++- `release_manifest.json` 固定本次发布的运行模块 SHA-256。`scripts/check_release.py` 先校验文件存在与哈希、Python 语法，再在新进程导入实际包并检查训练接口、默认版本、校准模式和可选检查点。
++- 指定 --checkpoint 时，绕过预测接口的容错层显式调用校准器，避免旧模块不认识检查点却静默退回 MLP。此为验收工具，不改变线上预测容错行为。
++- Dockerfile 的实际 COPY 后执行 image layout 预检并要求 SDK CLI 可导入。未满足则构建失败；这不替代完整 SDK 协议测试。
++- `scripts/build_source_bundle.py` 明确导出目录，排除权重、数据、状态、旧 ZIP、SDK 和缓存；生成 ZIP 后，在临时目录解压，由新 Python 进程运行预检和完整单测，全部成功后才输出最终 ZIP。
++- 增加七项测试：新进程导入、缺失/陈旧模块、Docker 路径映射、非法清单路径、不兼容检查点，Docker 构建上下文必需文件，以及 0.16 的十轮合成数据父子状态/finish 链。
++
++哈希清单用于发现误混版本和遗漏，不是数字签名，也不能证明训练效果。源码预检缺 SDK 会明确警告；只有 --require-sdk 才将 SDK 缺失作为错误。
++
++## 验证结果与边界
++
++| 验证 | 结果 |
++|---|---|
++| v16 工作区完整单测 | Ran 92 tests，OK |
++| 最终源码 ZIP 解压后完整单测 | Ran 92 tests，OK；见 bundle-check.log |
++| 生产入口/新脚本 py_compile | 退出 0 |
++| 新进程源码预检 | ok=true；明确提示 SDK 不可用 |
++| 已有 res_mlp_v2 检查点预检 | 通过，checkpoint 哈希见 preflight.json |
++| A 1244 行、B 1679 行、C 23049 行公开批量预测 | v15/v16 预测 SHA-256 分别相同 |
++| 各题前 64 条真实 predict 入口 | v15/v16 响应 SHA-256 分别相同 |
++| 0.16 十轮合成续训 | 状态/父模型/预算/finish 接线通过；不是平台评测 |
++
++本次没有在真实公开集上重新训练 v16，因为算法与训练实现未改；只做必要的合成训练回归和已有检查点推理核对。旧 v15 的固定公开 C 十轮对照为 NASA -4.4275%、RMSE +0.1297%，它仍是历史 v15 证据，不能标成 v16 新训练结果。旧 SwanLab 离线记录也不会被改名成 v16 或事后补录。
++
++A/B 推理对照使用官方公开包基线检查点；C 使用已选的 v15 检查点，不是三题在平台上的最终隐藏结果。所有测量只用公开数据，未获得或使用隐藏标签。
++
++当前仍缺官方 _sdk，Docker Linux daemon 未运行。没有实际镜像 digest、SDK 全流程或隐藏集结果。运行模块的正确打包不能替代这些验收，源码候选不等于可直接上传的已验收 tar。
++
++## 使用、回退与后续
++
++解压新源码，先执行：
++```powershell
++py -3.12 scripts/check_release.py --root .
++py -3.12 -m unittest discover -s tests -v
++py -3.12 scripts/check_release.py --root . --checkpoint <已有检查点>
++```
++本机 py 启动器不可用，实际使用已安装 Python 3.12 的完整路径；日志真实附录。未增加运行时依赖。
++
++准备官方 SDK 后按 `02-构建与验收.md` 构建并进行断网 describe/predict、平台 SDK 全流程。若改了代码，必须重新打包，不得手动复制单个入口到旧镜像：
++```powershell
++py -3.12 scripts/build_source_bundle.py --output <新的源码zip路径>
++```
++该命令会生成当前代码清单、解压校验并重跑单测；输出路径须不存在。若需复现原 v15，恢复整份我方 v15 源码/镜像与匹配状态，不要回退到队友这个混合包。v16 新增的是交付门禁，可通过恢复完整 v15 版本回退；切换 RSI_RELEASE=0.15 保留算法兼容，不移除这些发布检查。
++
++风险：3-epoch 预留和有限探针仍是 v15 启发式，可能牺牲早期收益；13 请求 epoch 不是等 CPU 成本。回滚/kill/预算耗尽时，后几轮仍可能合法跳过。本版未为消除“未训练”文案而强行接纳坏候选。
+--- /dev/null
++++ b/scripts/build_source_bundle.py
+@@ -0,0 +1,78 @@
++"""Build and validate a source ZIP, including imports after clean extraction."""
++from __future__ import annotations
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import subprocess
++import sys
++import tempfile
++import zipfile
++
++ROOT = Path(__file__).resolve().parents[1]
++FOLDERS = {"src", "vendor", "harness", "scripts", "tests", "configs", "docs", "reports"}
++TOP_FILES = {"AGENTS.md", "README.md", "SOURCE_README.md", "THIRD_PARTY_LICENSES.md",
++             "Dockerfile", "harness.Dockerfile", "requirements.txt", "plan0.md", "plan1.md",
++             ".gitignore", ".dockerignore", "release_manifest.json"}
++EXCLUDED = {"__pycache__", ".git", "node_modules", "_state", "dist", "experiments", "_sdk"}
++
++
++def source_files():
++    for path in sorted(ROOT.rglob("*")):
++        if not path.is_file():
++            continue
++        rel = path.relative_to(ROOT)
++        if not (rel.parts[0] in FOLDERS or rel.as_posix() in TOP_FILES):
++            continue
++        if any(part in EXCLUDED for part in rel.parts):
++            continue
++        if path.suffix.lower() in {".pyc", ".npz", ".tar", ".zip", ".key", ".env", ".mhtml"}:
++            continue
++        yield rel.as_posix(), path
++
++
++def write_manifest():
++    hashes = {name: hashlib.sha256(path.read_bytes()).hexdigest()
++              for name, path in source_files()
++              if (name.split('/')[0] in {"src", "vendor", "harness"} and path.suffix == ".py")
++              or name == "scripts/check_release.py"}
++    manifest = {"schema": 1, "release": "0.16", "runtime_sha256": hashes,
++                "purpose": "detect mixed or incomplete releases; not a cryptographic signature"}
++    (ROOT / "release_manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--output",type=Path)
++    parser.add_argument("--manifest-only",action="store_true")
++    args=parser.parse_args()
++    write_manifest()
++    if args.manifest_only:
++        return
++    if not args.output:
++        parser.error("--output required unless --manifest-only")
++    if args.output.exists():
++        parser.error("output already exists; use a new path")
++    args.output.parent.mkdir(parents=True,exist_ok=True)
++    with tempfile.TemporaryDirectory() as temporary:
++        archive=Path(temporary)/"source.zip"
++        with zipfile.ZipFile(archive,"w",zipfile.ZIP_DEFLATED) as z:
++            for name,path in source_files():
++                z.write(path,"rsi-zhixun-harness-v16/"+name)
++        clean=Path(temporary)/"clean"
++        with zipfile.ZipFile(archive) as z:
++            if z.testzip() is not None:
++                raise RuntimeError("ZIP CRC check failed")
++            z.extractall(clean)
++        root=clean/"rsi-zhixun-harness-v16"
++        # A fresh process prevents an already-imported good module from masking
++        # a missing or older module in the newly exported ZIP.
++        subprocess.run([sys.executable,str(root/"scripts/check_release.py"),"--root",str(root)],
++                       check=True,cwd=root)
++        subprocess.run([sys.executable,"-m","unittest","discover","-s","tests","-v"],
++                       check=True,cwd=root)
++        args.output.write_bytes(archive.read_bytes())
++    print(json.dumps({"bundle":str(args.output),"sha256":hashlib.sha256(args.output.read_bytes()).hexdigest()}))
++
++
++if __name__=="__main__": main()
+--- /dev/null
++++ b/scripts/check_release.py
+@@ -0,0 +1,154 @@
++"""Check the delivered code, interfaces and optional checkpoint, without training.
++
++Uses only stdlib and NumPy. Missing SDK is reported separately unless required.
++Source paths are mapped to the Docker COPY layout for image checks.
++"""
++from __future__ import annotations
++
++import argparse
++import ast
++import hashlib
++import importlib
++import importlib.util
++import inspect
++import json
++from pathlib import Path, PurePosixPath
++import sys
++
++
++IMAGE_PATHS = {"harness/contest_submission.py": "contest_submission.py",
++               "harness/harness.py": "harness.py"}
++
++
++def file_checks(root, manifest, layout):
++    errors = []
++    hashes = manifest.get("runtime_sha256")
++    required = {"harness/contest_submission.py", "src/harness/late_budget.py",
++                "src/harness/round_controller.py", "src/harness/model_receipt.py",
++                "src/models/official_round.py", "vendor/contest_baselines/c_calibration.py",
++                "vendor/contest_baselines/model.py", "scripts/check_release.py"}
++    if not isinstance(hashes, dict) or not required <= hashes.keys():
++        return ["manifest_missing_required_modules"]
++    for name, expected in hashes.items():
++        rel = PurePosixPath(name)
++        if rel.is_absolute() or ".." in rel.parts or "\\" in name or ":" in name:
++            errors.append("invalid_manifest_path:" + name)
++            continue
++        path = root / (IMAGE_PATHS.get(name, name) if layout == "image" else name)
++        if not path.is_file():
++            errors.append("missing_file:" + name)
++        elif hashlib.sha256(path.read_bytes()).hexdigest() != expected:
++            errors.append("hash_mismatch:" + name)
++        elif path.suffix == ".py":
++            try:
++                compile(path.read_bytes(), str(path), "exec")
++            except (SyntaxError, ValueError):
++                errors.append("invalid_python:" + name)
++    return errors
++
++
++def checkpoint_check(path):
++    import numpy as np
++    from vendor.contest_baselines.model import Model
++    from vendor.contest_baselines import c_calibration
++    model = Model.load(path)
++    x = np.tile(model.mean, (2, 1))
++    state = model.meta.get("c_calibration")
++    if model.meta["task"] == "regression" and state:
++        # Call the calibrator directly so Model.predict's fallback cannot hide
++        # an unsupported checkpoint or mismatched legacy calibration module.
++        known = sorted(state.get("moments", {}), key=float)
++        if known and x.shape[1] > 21:
++            x[:, 21] = float(known[0])
++        _, logits = model.forward(model.normalized(x))
++        raw = np.maximum(0, logits[:, 0] * model.meta["target_scale"] + model.meta["target_mean"])
++        expected = c_calibration.predict(x, raw, state)
++        if not np.all(np.isfinite(expected)):
++            raise ValueError("calibration_nonfinite")
++        np.testing.assert_allclose(model.predict(x), expected, rtol=1e-12, atol=1e-9)
++    else:
++        if not np.all(np.isfinite(model.predict(x))):
++            raise ValueError("prediction_nonfinite")
++    return {"task": model.meta["task"], "calibration": state.get("version", "v8") if state else "none",
++            "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest()}
++
++
++def run(root, layout="source", require_sdk=False, checkpoint=None):
++    root = Path(root).resolve()
++    result = {"schema": 1, "release": None, "layout": layout, "ok": False,
++              "errors": [], "warnings": [], "sdk_available": False}
++    try:
++        manifest = json.loads((root / "release_manifest.json").read_text(encoding="utf-8"))
++        result["release"] = manifest["release"]
++        result["errors"] = file_checks(root, manifest, layout)
++    except (OSError, ValueError, KeyError, TypeError) as exc:
++        result["errors"].append("invalid_or_missing_manifest:" + type(exc).__name__)
++        return result
++    # Never import code from a mixed or tampered bundle.
++    if result["errors"]:
++        return result
++    sys.path[:0] = [str(root), str(root / "harness")]
++    try:
++        submission = importlib.import_module("contest_submission")
++        from src.models.official_round import OfficialRound
++        from vendor.contest_baselines import c_calibration
++        for name in ("selection_task", "smooth_weights", "calibration_mode", "validation_groups"):
++            if name not in inspect.signature(OfficialRound.continue_round).parameters:
++                result["errors"].append("trainer_missing_parameter:" + name)
++        release = manifest["release"]
++        if submission.calibration_mode(release) != "res_mlp_v2" or not submission.calibration_enabled(release):
++            result["errors"].append("wrong_release_calibration")
++        if "res_mlp_v2" not in c_calibration.SUPPORTED_MODES:
++            result["errors"].append("missing_res_mlp_v2")
++        entry = root / ("contest_submission.py" if layout == "image" else "harness/contest_submission.py")
++        tree = ast.parse(entry.read_text(encoding="utf-8"))
++        defaults = [n.value.args[1].value for n in tree.body if isinstance(n, ast.Assign)
++                    and any(isinstance(t, ast.Name) and t.id == "RELEASE" for t in n.targets)
++                    and isinstance(n.value, ast.Call) and len(n.value.args) == 2
++                    and isinstance(n.value.args[1], ast.Constant)]
++        if defaults != [release]:
++            result["errors"].append("entry_default_release_mismatch")
++        if layout == "source":
++            docker = (root / "harness.Dockerfile").read_text(encoding="utf-8")
++            if f"ARG RSI_RELEASE={release}\n" not in docker:
++                result["errors"].append("docker_default_release_mismatch")
++            ignore = (root / ".dockerignore").read_text(encoding="utf-8").splitlines()
++            for line in ("!scripts/", "!scripts/check_release.py", "!release_manifest.json"):
++                if line not in ignore:
++                    result["errors"].append("docker_context_missing_allow:" + line)
++        try:
++            result["sdk_available"] = importlib.util.find_spec("contest_harness") is not None
++        except (ValueError, ImportError):
++            pass
++        if require_sdk:
++            from contest_harness.cli import main
++            if not callable(main):
++                result["errors"].append("sdk_cli_not_callable")
++        elif not result["sdk_available"]:
++            result["warnings"].append("sdk_not_checked:source_check_is_not_sdk_acceptance")
++        if checkpoint:
++            result["checkpoint"] = checkpoint_check(checkpoint)
++    except Exception as exc:
++        result["errors"].append("interface_or_checkpoint_error:" + type(exc).__name__)
++    result["ok"] = not result["errors"]
++    return result
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
++    parser.add_argument("--layout", choices=("source", "image"), default="source")
++    parser.add_argument("--require-sdk", action="store_true")
++    parser.add_argument("--checkpoint", type=Path)
++    parser.add_argument("--report", type=Path)
++    args = parser.parse_args()
++    report = run(args.root, args.layout, args.require_sdk, args.checkpoint)
++    text = json.dumps(report, ensure_ascii=False, indent=2)
++    if args.report:
++        args.report.write_text(text + "\n", encoding="utf-8")
++    print(text)
++    return 0 if report["ok"] else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+--- a/tests/test_late_budget.py
++++ b/tests/test_late_budget.py
+@@ -104,7 +104,7 @@
+                     declared_paths=lambda:['checkpoint.npz'],path=lambda *a,**k:parent),
+                     data=SimpleNamespace(train_path=train,validation_path=val),save_state=save_state,
+                     finish=lambda **kw:finishes.append(kw),submit_candidate=submit)
+-                with patch.object(submission,'WORKSPACE',work),patch.object(submission,'STATE_DIR',state),patch.object(submission,'RELEASE','0.15'):
++                with patch.object(submission,'WORKSPACE',work),patch.object(submission,'STATE_DIR',state),patch.object(submission,'RELEASE',getattr(self,'release_profile','0.15')):
+                     submission.train(rnd)
+                 c=finishes[-1]['configuration']; history.append({'round_index':r,'configuration':c})
+                 self.assertNotEqual(c['execution']['status'],'training_error')
+--- /dev/null
++++ b/tests/test_release_bundle.py
+@@ -0,0 +1,83 @@
++"""Reproduce incomplete/legacy delivery failures without training."""
++import json
++from pathlib import Path
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from unittest.mock import patch
++import numpy as np
++
++ROOT=Path(__file__).resolve().parents[1]
++sys.path[:0]=[str(ROOT),str(ROOT/'scripts')]
++from check_release import file_checks, checkpoint_check
++from vendor.contest_baselines.model import Model
++from vendor.contest_baselines.data import flatten
++
++
++class ReleaseBundleTests(unittest.TestCase):
++    def manifest(self):
++        return json.loads((ROOT/'release_manifest.json').read_text(encoding='utf-8'))
++
++    def test_real_release_imports_in_fresh_process(self):
++        r=subprocess.run([sys.executable,str(ROOT/'scripts/check_release.py'),'--root',str(ROOT)],
++                         capture_output=True,text=True,encoding='utf-8')
++        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
++        self.assertTrue(json.loads(r.stdout)['ok'])
++
++    def test_missing_budget_and_changed_calibrator_are_detected(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root=Path(temporary)
++            for name in self.manifest()['runtime_sha256']:
++                dest=root/name;dest.parent.mkdir(parents=True,exist_ok=True)
++                shutil.copyfile(ROOT/name,dest)
++            (root/'src/harness/late_budget.py').unlink()
++            (root/'vendor/contest_baselines/c_calibration.py').write_text('# stale module\n',encoding='utf-8')
++            errors=file_checks(root,self.manifest(),'source')
++            self.assertIn('missing_file:src/harness/late_budget.py',errors)
++            self.assertIn('hash_mismatch:vendor/contest_baselines/c_calibration.py',errors)
++
++    def test_image_copy_layout(self):
++        from check_release import IMAGE_PATHS
++        with tempfile.TemporaryDirectory() as temporary:
++            root=Path(temporary)
++            for name in self.manifest()['runtime_sha256']:
++                dest=root/IMAGE_PATHS.get(name,name);dest.parent.mkdir(parents=True,exist_ok=True)
++                shutil.copyfile(ROOT/name,dest)
++            self.assertEqual(file_checks(root,self.manifest(),'image'),[])
++
++    def test_bad_manifest_paths_are_rejected(self):
++        m=self.manifest();m['runtime_sha256']['../outside.py']='0'*64
++        self.assertIn('invalid_manifest_path:../outside.py',file_checks(ROOT,m,'source'))
++
++    def test_docker_preflight_inputs_are_in_build_context(self):
++        lines=(ROOT/'.dockerignore').read_text(encoding='utf-8').splitlines()
++        for rule in ('!scripts/','!scripts/check_release.py','!release_manifest.json','!_sdk/'):
++            self.assertIn(rule,lines)
++        docker=(ROOT/'harness.Dockerfile').read_text(encoding='utf-8')
++        self.assertIn('COPY release_manifest.json /app/release_manifest.json',docker)
++        self.assertIn('--layout image --require-sdk',docker)
++
++    def test_unknown_calibration_cannot_hide_behind_model_fallback(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            x=np.zeros((32,24));paths,_=flatten(x[0].tolist())
++            model=Model('regression',paths,[],x,np.ones(32),hidden=4)
++            model.meta['c_calibration']={'version':'unsupported-version'}
++            p=Path(temporary)/'checkpoint.npz';model.save(p)
++            with self.assertRaises(ValueError): checkpoint_check(p)
++
++    def test_version16_uses_v15_policy_and_calibration(self):
++        sys.path.insert(0,str(ROOT/'harness'))
++        import contest_submission as submission
++        self.assertTrue(submission.calibration_enabled('0.16'))
++        self.assertEqual(submission.calibration_mode('0.16'),'res_mlp_v2')
++        # Exercise all ten calls with the actual new profile, using the existing
++        # disjoint synthetic train/val parent-state-finish test.
++        from test_late_budget import LateBudgetTests
++        case=LateBudgetTests('test_ten_round_synthetic_parent_state_finish_chain')
++        case.release_profile='0.16'
++        case.test_ten_round_synthetic_parent_state_finish_chain()
++
++
++if __name__=='__main__':unittest.main(verbosity=2)

@@ -1,0 +1,177 @@
+{
+  "schema": 1,
+  "release": "0.16",
+  "layout": "source",
+  "ok": true,
+  "errors": [],
+  "warnings": [
+    "sdk_not_checked:source_check_is_not_sdk_acceptance"
+  ],
+  "sdk_available": false
+}
+test_cli_paired_metrics_and_engine_tail (test_audit_c_tail.TailAuditTests.test_cli_paired_metrics_and_engine_tail) ... ok
+test_huge_tied_penalties_and_small_engine_ranking (test_audit_c_tail.TailAuditTests.test_huge_tied_penalties_and_small_engine_ranking) ... ok
+test_same_width_schema_mismatch_rejected (test_audit_c_tail.TailAuditTests.test_same_width_schema_mismatch_rejected) ... ok
+test_zero_total_and_only_unknown (test_audit_c_tail.TailAuditTests.test_zero_total_and_only_unknown) ... ok
+test_checkpoint_roundtrip_keeps_calibration (test_c_calibration.CalibrationTests.test_checkpoint_roundtrip_keeps_calibration) ... ok
+test_continue_round_can_fit_calibration (test_c_calibration.CalibrationTests.test_continue_round_can_fit_calibration) ... ok
+test_fit_is_bounded_and_unseen_condition_falls_back (test_c_calibration.CalibrationTests.test_fit_is_bounded_and_unseen_condition_falls_back) ... ok
+test_c_new_stage_budget_and_nasa_bonus_gate (test_c_calibration_v92.CalibrationV92Tests.test_c_new_stage_budget_and_nasa_bonus_gate) ... ok
+test_cmapss_group_extraction_from_meta_and_id (test_c_calibration_v92.CalibrationV92Tests.test_cmapss_group_extraction_from_meta_and_id) ... ok
+test_continue_round_checkpoint_roundtrip_for_both_modes (test_c_calibration_v92.CalibrationV92Tests.test_continue_round_checkpoint_roundtrip_for_both_modes) ... ok
+test_nonfinite_rejected_for_new_modes (test_c_calibration_v92.CalibrationV92Tests.test_nonfinite_rejected_for_new_modes) ... ok
+test_release_and_override_mode_selection (test_c_calibration_v92.CalibrationV92Tests.test_release_and_override_mode_selection) ... ok
+test_spline_v2_and_res_mlp_v1_bounds_fallback_and_roundtrip (test_c_calibration_v92.CalibrationV92Tests.test_spline_v2_and_res_mlp_v1_bounds_fallback_and_roundtrip) ... ok
+test_holdout_rejects_shared_id_or_renamed_feature_row (test_compare_paired_selection.ComparePairedSelection.test_holdout_rejects_shared_id_or_renamed_feature_row) ... ok
+test_no_holdout_does_not_reuse_validation (test_compare_paired_selection.ComparePairedSelection.test_no_holdout_does_not_reuse_validation) ... ok
+test_real_training_and_independent_scoring (test_compare_paired_selection.ComparePairedSelection.test_real_training_and_independent_scoring) ... ok
+test_historical_signal_replay_leaves_r9_budget (test_late_budget.LateBudgetTests.test_historical_signal_replay_leaves_r9_budget) ... ok
+test_hold_protected_but_rollback_respected (test_late_budget.LateBudgetTests.test_hold_protected_but_rollback_respected) ... ok
+test_idle_probe_and_kill (test_late_budget.LateBudgetTests.test_idle_probe_and_kill) ... ok
+test_partial_failure_does_not_claim_zero_executed (test_late_budget.LateBudgetTests.test_partial_failure_does_not_claim_zero_executed) ... ok
+test_release_keeps_v14_calibrator (test_late_budget.LateBudgetTests.test_release_keeps_v14_calibrator) ... ok
+test_reserve_released_and_cannot_overspend (test_late_budget.LateBudgetTests.test_reserve_released_and_cannot_overspend) ... ok
+test_same_stage_cheap_but_first_and_new_stage_unchanged (test_late_budget.LateBudgetTests.test_same_stage_cheap_but_first_and_new_stage_unchanged) ... ok
+test_ten_round_synthetic_parent_state_finish_chain (test_late_budget.LateBudgetTests.test_ten_round_synthetic_parent_state_finish_chain) ... [submission] round 1: rows=65 psi_prev=0.000 stage_changed=True rule=first_round model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.002 calibrate_c=True mode=res_mlp_v2
+[submission] 第1轮（C-1）：首轮：在父检查点上做一次真实续训，给后续轮次一个可比较的起点。历史：无历史轮次。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=5.048 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.804145→0.692927 gain=+0.1383；执行状态=promoted；提交新候选。
+[submission] round 2: rows=66 psi_prev=0.022 stage_changed=False rule=new_stage model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.0015 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028407683092404, 'rmse': 0.6929272685050192, 'nasa': 0.8726787589460758, 'nasa_log1p': 0.6273698972444698, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5075132934544385, 'rmse': 0.6952701225374117, 'nasa': 0.8755635992242795, 'nasa_log1p': 0.6289092005083262, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.692927, 'after': 0.69527, 'gain': -0.003381, 'accepted': False, 'promote': False}
+[submission] 第2轮（C-1）：同一阶段内训练数据增长，输入移动较小（PSI=0.022），只做一次小步适配。历史：第1轮 ?(epochs=3, gain=0.138305)。漂移：PSI(上轮)=0.022 PSI(基线)=0.022 PSI(训/验)=3.569 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.692927→0.69527 gain=-0.0034；执行状态=trained_rejected；保持父模型。
+[submission] round 3: rows=67 psi_prev=0.005 stage_changed=False rule=new_stage model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.0015 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028407683092404, 'rmse': 0.6929272685050192, 'nasa': 0.8726787589460758, 'nasa_log1p': 0.6273698972444698, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5099773218330569, 'rmse': 0.6940014341603659, 'nasa': 0.884970217735669, 'nasa_log1p': 0.6339120211654342, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.692927, 'after': 0.694001, 'gain': -0.00155, 'accepted': False, 'promote': False}
+[submission] 第3轮（C-1）：同一阶段内训练数据增长，输入移动较小（PSI=0.005），只做一次小步适配。历史：第1轮 ?(epochs=3, gain=0.138305)；第2轮 ?(epochs=3, gain=-0.003381)。漂移：PSI(上轮)=0.005 PSI(基线)=0.023 PSI(训/验)=3.531 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.692927→0.694001 gain=-0.0015；执行状态=trained_rejected；保持父模型。
+[submission] round 4: rows=68 psi_prev=0.010 stage_changed=True rule=c_stage_probe model=unavailable source=budget model_status=empty budget=1ep
+[submission] training: epochs=1 lr=0.0015 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028407683092404, 'rmse': 0.6929272685050192, 'nasa': 0.8726787589460758, 'nasa_log1p': 0.6273698972444698, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5112615342429354, 'rmse': 0.6934763322005458, 'nasa': 0.8872816502439995, 'nasa_log1p': 0.6351375134594313, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.692927, 'after': 0.693476, 'gain': -0.000792, 'accepted': False, 'promote': False}
+[submission] 第4轮（C-2）：C 13-epoch limit with late-stage reserve。历史：第1轮 ?(epochs=3, gain=0.138305)；第2轮 ?(epochs=3, gain=-0.003381)；第3轮 ?(epochs=3, gain=-0.00155)。漂移：PSI(上轮)=0.010 PSI(基线)=0.020 PSI(训/验)=3.454 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.692927→0.693476 gain=-0.0008；执行状态=trained_rejected；保持父模型。
+[submission] round 5: rows=69 psi_prev=0.005 stage_changed=False rule=new_data_probe model=unavailable source=budget model_status=empty budget=0ep
+[submission] 第5轮（C-2）：C 13-epoch limit with late-stage reserve。历史：第2轮 ?(epochs=3, gain=-0.003381)；第3轮 ?(epochs=3, gain=-0.00155)；第4轮 ?(epochs=1, gain=-0.000792)。漂移：PSI(上轮)=0.005 PSI(基线)=0.021 PSI(训/验)=3.565 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 0.6929；执行状态=skipped；保持父模型。
+[submission] round 6: rows=70 psi_prev=0.013 stage_changed=False rule=new_data_probe model=unavailable source=budget model_status=empty budget=0ep
+[submission] 第6轮（C-2）：C 13-epoch limit with late-stage reserve。历史：第3轮 ?(epochs=3, gain=-0.00155)；第4轮 ?(epochs=1, gain=-0.000792)；第5轮 ?(epochs=0, gain=None)。漂移：PSI(上轮)=0.013 PSI(基线)=0.025 PSI(训/验)=3.602 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 0.6929；执行状态=skipped；保持父模型。
+[submission] round 7: rows=71 psi_prev=0.005 stage_changed=True rule=c_stage_probe model=unavailable source=budget model_status=empty budget=0ep
+[submission] 第7轮（C-3）：C 13-epoch limit with late-stage reserve。历史：第4轮 ?(epochs=1, gain=-0.000792)；第5轮 ?(epochs=0, gain=None)；第6轮 ?(epochs=0, gain=None)。漂移：PSI(上轮)=0.005 PSI(基线)=0.024 PSI(训/验)=3.494 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 0.6929；执行状态=skipped；保持父模型。
+[submission] round 8: rows=72 psi_prev=0.011 stage_changed=False rule=new_data_probe model=unavailable source=rule model_status=empty budget=1ep
+[submission] training: epochs=1 lr=0.001 calibrate_c=True mode=res_mlp_v2
+[submission] 第8轮（C-3）：此前连续无收益，但训练数据又增长了；只用 1 个 epoch 做探针，避免重复浪费。历史：第5轮 ?(epochs=0, gain=None)；第6轮 ?(epochs=0, gain=None)；第7轮 ?(epochs=0, gain=None)。漂移：PSI(上轮)=0.011 PSI(基线)=0.029 PSI(训/验)=3.488 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.692927→0.689812 gain=+0.0045；执行状态=promoted；提交新候选。
+[submission] round 9: rows=72 psi_prev=0.003 stage_changed=False rule=calibration model=unavailable source=rule model_status=empty budget=1ep
+[submission] training: epochs=1 lr=0.001 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028080894613769, 'rmse': 0.689812102149288, 'nasa': 0.8771343385603697, 'nasa_log1p': 0.6297463259332123, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5018815695336543, 'rmse': 0.6890710849819809, 'nasa': 0.8748305105629431, 'nasa_log1p': 0.6285182609701268, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.689812, 'after': 0.689071, 'gain': 0.001074, 'accepted': True, 'promote': False}
+[submission] 第9轮（C-3）：C same-stage continuation: one epoch, reserve late-stage budget。历史：第6轮 ?(epochs=0, gain=None)；第7轮 ?(epochs=0, gain=None)；第8轮 ?(epochs=1, gain=0.004496)。漂移：PSI(上轮)=0.003 PSI(基线)=0.029 PSI(训/验)=3.488 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.689812→0.689071 gain=+0.0011；执行状态=trained_rejected；保持父模型。
+[submission] round 10: rows=72 psi_prev=0.003 stage_changed=True rule=c_stage_probe model=unavailable source=budget model_status=empty budget=1ep
+[submission] training: epochs=1 lr=0.0015 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028080894613769, 'rmse': 0.689812102149288, 'nasa': 0.8771343385603697, 'nasa_log1p': 0.6297463259332123, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5015454333486605, 'rmse': 0.6886923387045174, 'nasa': 0.8740512498328362, 'nasa_log1p': 0.6281025312719738, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.689812, 'after': 0.688692, 'gain': 0.001623, 'accepted': True, 'promote': False}
+[submission] 第10轮（C-4）：Remaining per-task epoch budget。历史：第7轮 ?(epochs=0, gain=None)；第8轮 ?(epochs=1, gain=0.004496)；第9轮 ?(epochs=1, gain=0.001074)。漂移：PSI(上轮)=0.003 PSI(基线)=0.029 PSI(训/验)=3.488 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.689812→0.688692 gain=+0.0016；执行状态=trained_rejected；保持父模型。
+ok
+test_a_keeps_ties_not_regressions (test_paired_selection.PairedSelectionTests.test_a_keeps_ties_not_regressions) ... ok
+test_b_rescues_promotable_bearing_candidate_only (test_paired_selection.PairedSelectionTests.test_b_rescues_promotable_bearing_candidate_only) ... ok
+test_c_risky_best_and_blend_cannot_displace_feasible_snapshot (test_paired_selection.PairedSelectionTests.test_c_risky_best_and_blend_cannot_displace_feasible_snapshot) ... ok
+test_c_without_eligible_snapshot_does_not_promote (test_paired_selection.PairedSelectionTests.test_c_without_eligible_snapshot_does_not_promote) ... ok
+test_caps_use_the_public_input_schema (test_prediction_caps.PredictionCapTests.test_caps_use_the_public_input_schema) ... ok
+test_bad_manifest_paths_are_rejected (test_release_bundle.ReleaseBundleTests.test_bad_manifest_paths_are_rejected) ... ok
+test_docker_preflight_inputs_are_in_build_context (test_release_bundle.ReleaseBundleTests.test_docker_preflight_inputs_are_in_build_context) ... ok
+test_image_copy_layout (test_release_bundle.ReleaseBundleTests.test_image_copy_layout) ... ok
+test_missing_budget_and_changed_calibrator_are_detected (test_release_bundle.ReleaseBundleTests.test_missing_budget_and_changed_calibrator_are_detected) ... ok
+test_real_release_imports_in_fresh_process (test_release_bundle.ReleaseBundleTests.test_real_release_imports_in_fresh_process) ... ok
+test_unknown_calibration_cannot_hide_behind_model_fallback (test_release_bundle.ReleaseBundleTests.test_unknown_calibration_cannot_hide_behind_model_fallback) ... ok
+test_version16_uses_v15_policy_and_calibration (test_release_bundle.ReleaseBundleTests.test_version16_uses_v15_policy_and_calibration) ... [submission] round 1: rows=65 psi_prev=0.000 stage_changed=True rule=first_round model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.002 calibrate_c=True mode=res_mlp_v2
+[submission] 第1轮（C-1）：首轮：在父检查点上做一次真实续训，给后续轮次一个可比较的起点。历史：无历史轮次。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=5.048 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.804145→0.692927 gain=+0.1383；执行状态=promoted；提交新候选。
+[submission] round 2: rows=66 psi_prev=0.022 stage_changed=False rule=new_stage model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.0015 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028407683092404, 'rmse': 0.6929272685050192, 'nasa': 0.8726787589460758, 'nasa_log1p': 0.6273698972444698, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5075132934544385, 'rmse': 0.6952701225374117, 'nasa': 0.8755635992242795, 'nasa_log1p': 0.6289092005083262, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.692927, 'after': 0.69527, 'gain': -0.003381, 'accepted': False, 'promote': False}
+[submission] 第2轮（C-1）：同一阶段内训练数据增长，输入移动较小（PSI=0.022），只做一次小步适配。历史：第1轮 ?(epochs=3, gain=0.138305)。漂移：PSI(上轮)=0.022 PSI(基线)=0.022 PSI(训/验)=3.569 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.692927→0.69527 gain=-0.0034；执行状态=trained_rejected；保持父模型。
+[submission] round 3: rows=67 psi_prev=0.005 stage_changed=False rule=new_stage model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.0015 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028407683092404, 'rmse': 0.6929272685050192, 'nasa': 0.8726787589460758, 'nasa_log1p': 0.6273698972444698, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5099773218330569, 'rmse': 0.6940014341603659, 'nasa': 0.884970217735669, 'nasa_log1p': 0.6339120211654342, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.692927, 'after': 0.694001, 'gain': -0.00155, 'accepted': False, 'promote': False}
+[submission] 第3轮（C-1）：同一阶段内训练数据增长，输入移动较小（PSI=0.005），只做一次小步适配。历史：第1轮 ?(epochs=3, gain=0.138305)；第2轮 ?(epochs=3, gain=-0.003381)。漂移：PSI(上轮)=0.005 PSI(基线)=0.023 PSI(训/验)=3.531 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.692927→0.694001 gain=-0.0015；执行状态=trained_rejected；保持父模型。
+[submission] round 4: rows=68 psi_prev=0.010 stage_changed=True rule=c_stage_probe model=unavailable source=budget model_status=empty budget=1ep
+[submission] training: epochs=1 lr=0.0015 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028407683092404, 'rmse': 0.6929272685050192, 'nasa': 0.8726787589460758, 'nasa_log1p': 0.6273698972444698, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5112615342429354, 'rmse': 0.6934763322005458, 'nasa': 0.8872816502439995, 'nasa_log1p': 0.6351375134594313, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.692927, 'after': 0.693476, 'gain': -0.000792, 'accepted': False, 'promote': False}
+[submission] 第4轮（C-2）：C 13-epoch limit with late-stage reserve。历史：第1轮 ?(epochs=3, gain=0.138305)；第2轮 ?(epochs=3, gain=-0.003381)；第3轮 ?(epochs=3, gain=-0.00155)。漂移：PSI(上轮)=0.010 PSI(基线)=0.020 PSI(训/验)=3.454 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.692927→0.693476 gain=-0.0008；执行状态=trained_rejected；保持父模型。
+[submission] round 5: rows=69 psi_prev=0.005 stage_changed=False rule=new_data_probe model=unavailable source=budget model_status=empty budget=0ep
+[submission] 第5轮（C-2）：C 13-epoch limit with late-stage reserve。历史：第2轮 ?(epochs=3, gain=-0.003381)；第3轮 ?(epochs=3, gain=-0.00155)；第4轮 ?(epochs=1, gain=-0.000792)。漂移：PSI(上轮)=0.005 PSI(基线)=0.021 PSI(训/验)=3.565 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 0.6929；执行状态=skipped；保持父模型。
+[submission] round 6: rows=70 psi_prev=0.013 stage_changed=False rule=new_data_probe model=unavailable source=budget model_status=empty budget=0ep
+[submission] 第6轮（C-2）：C 13-epoch limit with late-stage reserve。历史：第3轮 ?(epochs=3, gain=-0.00155)；第4轮 ?(epochs=1, gain=-0.000792)；第5轮 ?(epochs=0, gain=None)。漂移：PSI(上轮)=0.013 PSI(基线)=0.025 PSI(训/验)=3.602 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 0.6929；执行状态=skipped；保持父模型。
+[submission] round 7: rows=71 psi_prev=0.005 stage_changed=True rule=c_stage_probe model=unavailable source=budget model_status=empty budget=0ep
+[submission] 第7轮（C-3）：C 13-epoch limit with late-stage reserve。历史：第4轮 ?(epochs=1, gain=-0.000792)；第5轮 ?(epochs=0, gain=None)；第6轮 ?(epochs=0, gain=None)。漂移：PSI(上轮)=0.005 PSI(基线)=0.024 PSI(训/验)=3.494 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 0.6929；执行状态=skipped；保持父模型。
+[submission] round 8: rows=72 psi_prev=0.011 stage_changed=False rule=new_data_probe model=unavailable source=rule model_status=empty budget=1ep
+[submission] training: epochs=1 lr=0.001 calibrate_c=True mode=res_mlp_v2
+[submission] 第8轮（C-3）：此前连续无收益，但训练数据又增长了；只用 1 个 epoch 做探针，避免重复浪费。历史：第5轮 ?(epochs=0, gain=None)；第6轮 ?(epochs=0, gain=None)；第7轮 ?(epochs=0, gain=None)。漂移：PSI(上轮)=0.011 PSI(基线)=0.029 PSI(训/验)=3.488 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.692927→0.689812 gain=+0.0045；执行状态=promoted；提交新候选。
+[submission] round 9: rows=72 psi_prev=0.003 stage_changed=False rule=calibration model=unavailable source=rule model_status=empty budget=1ep
+[submission] training: epochs=1 lr=0.001 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028080894613769, 'rmse': 0.689812102149288, 'nasa': 0.8771343385603697, 'nasa_log1p': 0.6297463259332123, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5018815695336543, 'rmse': 0.6890710849819809, 'nasa': 0.8748305105629431, 'nasa_log1p': 0.6285182609701268, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.689812, 'after': 0.689071, 'gain': 0.001074, 'accepted': True, 'promote': False}
+[submission] 第9轮（C-3）：C same-stage continuation: one epoch, reserve late-stage budget。历史：第6轮 ?(epochs=0, gain=None)；第7轮 ?(epochs=0, gain=None)；第8轮 ?(epochs=1, gain=0.004496)。漂移：PSI(上轮)=0.003 PSI(基线)=0.029 PSI(训/验)=3.488 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.689812→0.689071 gain=+0.0011；执行状态=trained_rejected；保持父模型。
+[submission] round 10: rows=72 psi_prev=0.003 stage_changed=True rule=c_stage_probe model=unavailable source=budget model_status=empty budget=1ep
+[submission] training: epochs=1 lr=0.0015 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 0.5028080894613769, 'rmse': 0.689812102149288, 'nasa': 0.8771343385603697, 'nasa_log1p': 0.6297463259332123, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} after={'mae': 0.5015454333486605, 'rmse': 0.6886923387045174, 'nasa': 0.8740512498328362, 'nasa_log1p': 0.6281025312719738, 'nasa_saturated': False, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 20} outcome={'metric': 'rmse', 'before': 0.689812, 'after': 0.688692, 'gain': 0.001623, 'accepted': True, 'promote': False}
+[submission] 第10轮（C-4）：Remaining per-task epoch budget。历史：第7轮 ?(epochs=0, gain=None)；第8轮 ?(epochs=1, gain=0.004496)；第9轮 ?(epochs=1, gain=0.001074)。漂移：PSI(上轮)=0.003 PSI(基线)=0.029 PSI(训/验)=3.488 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.689812→0.688692 gain=+0.0016；执行状态=trained_rejected；保持父模型。
+ok
+test_model_timeout_still_attempts_finish_and_saves_state (test_release_safety.ContinuationTests.test_model_timeout_still_attempts_finish_and_saves_state) ... [submission] round 1: rows=32 psi_prev=0.000 stage_changed=True rule=first_round model=unavailable source=rule model_status=call_error budget=5ep
+[submission] training: epochs=5 lr=0.002 calibrate_c=False mode=none
+[submission] candidate kept aside: before={'mae': 0.0, 'rmse': 0.0, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 32} after={'mae': 0.0, 'rmse': 0.0, 'by_group': {}, 'group_rows': 0, 'ungrouped_rows': 32} outcome={'metric': 'rmse', 'before': 0.0, 'after': 0.0, 'gain': 0.0, 'accepted': True, 'promote': False}
+[submission] 第1轮（test）：首轮：在父检查点上做一次真实续训，给后续轮次一个可比较的起点。历史：无历史轮次。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.000 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 0.0→0.0 gain=+0.0000；执行状态=trained_rejected；保持父模型。
+ok
+test_saved_best_snapshot_counters_are_distinct_from_executed (test_release_safety.ContinuationTests.test_saved_best_snapshot_counters_are_distinct_from_executed) ... ok
+test_calibration_override_can_disable_default (test_release_safety.MetricsTests.test_calibration_override_can_disable_default) ... ok
+test_groups_and_missing_coverage (test_release_safety.MetricsTests.test_groups_and_missing_coverage) ... ok
+test_metadata_group_never_enters_features (test_release_safety.MetricsTests.test_metadata_group_never_enters_features) ... ok
+test_nasa_formula_and_extreme (test_release_safety.MetricsTests.test_nasa_formula_and_extreme) ... ok
+test_row_schema_migration_and_bounded_history (test_release_safety.MetricsTests.test_row_schema_migration_and_bounded_history) ... ok
+test_agreement_is_not_claimed_as_llm_change (test_release_safety.ReceiptTests.test_agreement_is_not_claimed_as_llm_change) ... ok
+test_bad_shapes_and_non_string_parts (test_release_safety.ReceiptTests.test_bad_shapes_and_non_string_parts) ... ok
+test_effective_hold_is_llm (test_release_safety.ReceiptTests.test_effective_hold_is_llm) ... ok
+test_empty_length_receipt_is_honest (test_release_safety.ReceiptTests.test_empty_length_receipt_is_honest) ... ok
+test_exception_degrades_and_does_not_log_error_text (test_release_safety.ReceiptTests.test_exception_degrades_and_does_not_log_error_text) ... ok
+test_classification_gain (test_round_controller.AcceptanceTests.test_classification_gain) ... ok
+test_classification_noise_not_promoted (test_round_controller.AcceptanceTests.test_classification_noise_not_promoted) ... ok
+test_metric_and_gap (test_round_controller.AcceptanceTests.test_metric_and_gap) ... ok
+test_regression_relative (test_round_controller.AcceptanceTests.test_regression_relative) ... ok
+test_remaining_life_has_no_upper_cap (test_round_controller.AcceptanceTests.test_remaining_life_has_no_upper_cap) ... ok
+test_v1_tolerance_only_on_a (test_round_controller.AcceptanceTests.test_v1_tolerance_only_on_a) ... ok
+test_a_quiet_round_uses_v1_one_epoch (test_round_controller.BudgetTests.test_a_quiet_round_uses_v1_one_epoch) ... ok
+test_first_round_always_trains (test_round_controller.BudgetTests.test_first_round_always_trains) ... ok
+test_model_can_only_reduce (test_round_controller.BudgetTests.test_model_can_only_reduce) ... ok
+test_model_cannot_resurrect_a_noop (test_round_controller.BudgetTests.test_model_cannot_resurrect_a_noop) ... ok
+test_model_hold_ignored_on_drift (test_round_controller.BudgetTests.test_model_hold_ignored_on_drift) ... ok
+test_model_hold_ignored_on_first_round (test_round_controller.BudgetTests.test_model_hold_ignored_on_first_round) ... ok
+test_new_stage_with_drift_gets_budget (test_round_controller.BudgetTests.test_new_stage_with_drift_gets_budget) ... ok
+test_stalled_run_stops_spending (test_round_controller.BudgetTests.test_stalled_run_stops_spending) ... ok
+test_three_failures_latch_across_rounds (test_round_controller.CrossRoundFuseTests.test_three_failures_latch_across_rounds) ... ok
+test_digest_from_platform_records (test_round_controller.HistoryTests.test_digest_from_platform_records) ... ok
+test_missing_recorded_gain_stays_unknown (test_round_controller.HistoryTests.test_missing_recorded_gain_stays_unknown) ... ok
+test_paired_history_uses_recorded_gain (test_round_controller.HistoryTests.test_paired_history_uses_recorded_gain) ... ok
+test_state_is_authoritative_when_records_empty (test_round_controller.HistoryTests.test_state_is_authoritative_when_records_empty) ... ok
+test_js_distance (test_round_controller.ProfileTests.test_js_distance) ... ok
+test_prediction_profile_classification (test_round_controller.ProfileTests.test_prediction_profile_classification) ... ok
+test_profile_and_psi_are_zero_on_same_rows (test_round_controller.ProfileTests.test_profile_and_psi_are_zero_on_same_rows) ... ok
+test_psi_grows_when_distribution_moves (test_round_controller.ProfileTests.test_psi_grows_when_distribution_moves) ... ok
+test_bad_text_returns_none (test_round_controller.VerdictTests.test_bad_text_returns_none) ... ok
+test_list_content (test_round_controller.VerdictTests.test_list_content) ... ok
+test_parse_fenced_json_with_chatter (test_round_controller.VerdictTests.test_parse_fenced_json_with_chatter) ... ok
+test_parse_plain_json (test_round_controller.VerdictTests.test_parse_plain_json) ... ok
+test_reasoning_content_is_used_when_content_empty (test_round_controller.VerdictTests.test_reasoning_content_is_used_when_content_empty) ... ok
+test_fit_and_serve_share_saturation_and_floor (test_v8_calibration.CalibrationV8Tests.test_fit_and_serve_share_saturation_and_floor) ... ok
+test_gate_the_risk_minimizer_not_the_best_feasible_point (test_v8_calibration.CalibrationV8Tests.test_gate_the_risk_minimizer_not_the_best_feasible_point) ... ok
+test_nasa_objective_denominator_has_unit_floor (test_v8_calibration.CalibrationV8Tests.test_nasa_objective_denominator_has_unit_floor) ... ok
+test_nonfinite_training_data_never_produces_checkpoint_state (test_v8_calibration.CalibrationV8Tests.test_nonfinite_training_data_never_produces_checkpoint_state) ... ok
+test_weighted_ridge_and_per_condition_sample_threshold (test_v8_calibration.CalibrationV8Tests.test_weighted_ridge_and_per_condition_sample_threshold) ... ok
+test_zero_and_extreme_nasa_baselines (test_v8_calibration.CalibrationV8Tests.test_zero_and_extreme_nasa_baselines) ... ok
+test_bearing_gain_can_rescue_small_pooled_loss (test_v8_gates.V8PromotionTests.test_bearing_gain_can_rescue_small_pooled_loss) ... ok
+test_c_nasa_veto_and_bonus (test_v8_gates.V8PromotionTests.test_c_nasa_veto_and_bonus) ... ok
+test_one_valid_bearing_is_not_enough (test_v8_gates.V8PromotionTests.test_one_valid_bearing_is_not_enough) ... ok
+test_limits_and_prompt (test_v8_receipt.ReceiptTests.test_limits_and_prompt) ... ok
+test_live_partial_requires_length (test_v8_receipt.ReceiptTests.test_live_partial_requires_length) ... ok
+test_no_prose_from_either_channel_reaches_state (test_v8_receipt.ReceiptTests.test_no_prose_from_either_channel_reaches_state) ... ok
+test_offline_parser_recovers_only_explicit_json (test_v8_receipt.ReceiptTests.test_offline_parser_recovers_only_explicit_json) ... ok
+test_recovered_agreement_does_not_claim_change (test_v8_receipt.ReceiptTests.test_recovered_agreement_does_not_claim_change) ... ok
+test_no_strict_gain_keeps_original_checkpoint_bytes (test_v8_smoothing.SmoothingTests.test_no_strict_gain_keeps_original_checkpoint_bytes) ... ok
+test_selects_refitted_c_blend_from_best_not_last_epoch (test_v8_smoothing.SmoothingTests.test_selects_refitted_c_blend_from_best_not_last_epoch) ... ok
+
+----------------------------------------------------------------------
+Ran 92 tests in 6.035s
+
+OK
+{"bundle": "..\\final-source.zip", "sha256": "e5b7ad20e3a7de559b5641c80147105a2ed21ddeef7cb1665f16e5f39de0f58b"}

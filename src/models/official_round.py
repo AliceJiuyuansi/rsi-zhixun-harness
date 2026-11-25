@@ -19,12 +19,14 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
-from vendor.contest_baselines.model import Model, checkpoint_digest
+from src.harness.round_controller import paired_acceptance
+from vendor.contest_baselines.model import PARAMETERS, Model, checkpoint_digest
 
 REPORT_FORMAT = "contest.cpu-baseline-report.v1"
 
@@ -93,6 +95,14 @@ def _primary_score(metrics: dict) -> float:
     return float(metrics.get("accuracy", 0.0))
 
 
+def _refit_c(model: Model, X_train, y_train, mode: str = "v8") -> None:
+    from vendor.contest_baselines.c_calibration import fit
+
+    # Fit residuals on the uncalibrated training predictions, never on the holdout.
+    model.meta.pop("c_calibration", None)
+    model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train), mode=mode)
+
+
 @dataclass
 class RoundResult:
     out_dir: Path
@@ -154,7 +164,8 @@ class OfficialRound:
                        learning_rate: float | None = None, batch_size: int | None = None,
                        patience: int = 0, calibrate_c: bool = False, validation_groups=None,
                        stage_id: str = "round", hypothesis: str = "",
-                       change_summary: str = "") -> RoundResult:
+                       change_summary: str = "", smooth_weights: bool = False,
+                       selection_task: str = "", calibration_mode: str = "v8") -> RoundResult:
         """Continue the parent for up to `epochs`, keeping the best-scoring weights.
 
         `patience > 0` enables early stopping: after that many epochs without a
@@ -162,6 +173,9 @@ class OfficialRound:
         longer" from quietly returning an over-fitted model - measured on the
         gas task, fixed 5-epoch continuation lowered pseudo-hidden macro-F1 from
         0.399 to 0.339 while the validation score went up.
+
+        `smooth_weights` tries a blend of the best epoch (85%) and parent (15%).
+        It replaces the best epoch only on a strict same-holdout improvement.
         """
         parent = Path(parent_checkpoint)
         out = Path(out_dir)
@@ -178,7 +192,29 @@ class OfficialRound:
         if X_val.shape[1] != len(model.meta["paths"]):
             raise ValueError("validation features do not match the checkpoint schema")
 
-        before = self.evaluate(model, X_val, y_val, groups=validation_groups)
+        if selection_task not in ("", "A", "B", "C"):
+            raise ValueError("unknown snapshot selection task")
+        cpu = {key: 0.0 for key in ("fit", "calibration", "validation", "smoothed_calibration", "smoothed_validation")}
+
+        @contextmanager
+        def measured(key):
+            start = time.process_time()
+            try:
+                yield
+            finally:
+                cpu[key] += time.process_time() - start
+
+        with measured("validation"):
+            before = self.evaluate(model, X_val, y_val, groups=validation_groups)
+
+        def eligible(metrics):
+            return not selection_task or paired_acceptance(before, metrics, model.meta["task"], selection_task)["promote"]
+
+        def improves(ok, score):
+            # Lexicographic order: an eligible snapshot always beats an ineligible
+            # one. If neither can deploy, retain the best for diagnosis, not serving.
+            return (ok and not best_ok) or (ok == best_ok and score > best_score + 1e-12)
+
         epochs_before = int(model.meta["epochs"])
         steps_before = int(model.meta["steps"])
         if learning_rate is not None:
@@ -191,28 +227,44 @@ class OfficialRound:
         out.mkdir(parents=True, exist_ok=False)  # every round owns a fresh directory
 
         history: list[dict] = []
-        best_score = float("-inf")
+        best_score = unconstrained_best = float("-inf")
+        best_ok = False
         best_validation = before
         best_snapshot: Path | None = None
         epochs_without_progress = 0
         epochs_run = 0
-        for _ in range(int(epochs)):
-            loss = model.fit(X_train, np.asarray(y_train), 1)[0]
+        parent_weights = {k: model.params[k].copy() for k in PARAMETERS} if smooth_weights else None
+        total_epochs = int(epochs)
+        best_raw_rmse = float("inf")
+        for ep_idx in range(total_epochs):
+            with measured("fit"):
+                loss = model.fit(X_train, np.asarray(y_train), 1)[0]
             epochs_run += 1
             if calibrate_c:
-                from vendor.contest_baselines.c_calibration import fit
-                # Refit around this epoch's base prediction, never stack corrections.
-                model.meta.pop("c_calibration", None)
-                try:
-                    model.meta["c_calibration"] = fit(X_train, y_train, model.predict(X_train))
-                except Exception:  # noqa: BLE001 - calibration is optional; keep training
+                should_refit = True
+                if calibration_mode != "v8" and total_epochs > 1:
+                    # Skip expensive non-v8 refit on clearly degraded middle epochs.
                     model.meta.pop("c_calibration", None)
-            validation = self.evaluate(model, X_val, y_val, groups=validation_groups)
+                    raw_rmse = regression_metrics(y_val, model.predict(X_val))["rmse"]
+                    if ep_idx == 0 or ep_idx == total_epochs - 1 or raw_rmse <= best_raw_rmse * 1.005:
+                        best_raw_rmse = min(best_raw_rmse, raw_rmse)
+                    else:
+                        should_refit = False
+                if should_refit:
+                    try:
+                        with measured("calibration"):
+                            _refit_c(model, X_train, y_train, mode=calibration_mode)
+                    except Exception:  # noqa: BLE001 - calibration is optional; keep training
+                        model.meta.pop("c_calibration", None)
+            with measured("validation"):
+                validation = self.evaluate(model, X_val, y_val, groups=validation_groups)
+            ok = eligible(validation)
             history.append({"epoch": int(model.meta["epochs"]), "step": int(model.meta["steps"]),
-                            "loss": float(loss), "validation": validation})
+                            "loss": float(loss), "validation": validation,
+                            **({"eligible": ok} if selection_task else {})})
 
             score = _primary_score(validation)
-            if score > best_score + 1e-12:
+            if improves(ok, score):
                 # Snapshot the weights + Adam state that actually scored best, so
                 # "train longer" can never quietly hand back a worse model.
                 best_score = score
@@ -222,12 +274,41 @@ class OfficialRound:
                 if best_snapshot is not None:
                     best_snapshot.unlink(missing_ok=True)
                 best_snapshot = snapshot
+                best_ok = ok
+            # Keep the original primary-score patience and optimizer trajectory;
+            # only change which observed snapshot can be returned.
+            if score > unconstrained_best + 1e-12:
+                unconstrained_best = score
                 epochs_without_progress = 0
             else:
                 epochs_without_progress += 1
 
             if patience > 0 and epochs_without_progress >= patience:
                 break
+
+        smoothing = "not_attempted"
+        if best_snapshot is not None and parent_weights is not None:
+            # Start from the best epoch, including its unchanged Adam state and counters.
+            smoothed = Model.load(str(best_snapshot))
+            for key in PARAMETERS:
+                smoothed.params[key] = 0.85 * smoothed.params[key] + 0.15 * parent_weights[key]
+            try:
+                if calibrate_c:
+                    with measured("smoothed_calibration"):
+                        _refit_c(smoothed, X_train, y_train, mode=calibration_mode)
+                with measured("smoothed_validation"):
+                    validation = self.evaluate(smoothed, X_val, y_val, groups=validation_groups)
+            except (ValueError, ArithmeticError, np.linalg.LinAlgError):
+                # A bad optional fit must not discard an already valid trained snapshot.
+                smoothing = "invalid_candidate"
+            else:
+                smoothing = "kept_original"
+                if improves(eligible(validation), _primary_score(validation)):
+                    snapshot = out / ".snapshot-smoothed.npz"
+                    smoothed.save(snapshot)
+                    snapshot.replace(best_snapshot)
+                    best_validation = validation
+                    smoothing = "selected"
 
         seconds = time.perf_counter() - started
         checkpoint = out / "checkpoint.npz"
@@ -246,12 +327,15 @@ class OfficialRound:
             epochs_after=int(selected_model.meta["epochs"]), steps_after=int(selected_model.meta["steps"]),
             config={"epochs_requested": int(epochs), "epochs_run": epochs_run,
                     "early_stopped": bool(epochs_run < int(epochs)),
+                    "weight_smoothing": smoothing, "selection_task": selection_task,
+                    "component_cpu_seconds": cpu,
                     "executed_steps": int(model.meta["steps"]) - steps_before,
                     "executed_final_epochs": int(model.meta["epochs"]),
                     "executed_final_steps": int(model.meta["steps"]),
                     "learning_rate": float(model.meta["learning_rate"]),
                     "batch_size": int(model.meta["batch_size"]),
                     "calibrate_c": bool(calibrate_c),
+                    "calibration_mode": calibration_mode if calibrate_c else "",
                     "stage_id": stage_id, "hypothesis": hypothesis,
                     "change_summary": change_summary},
         )
@@ -270,6 +354,8 @@ class OfficialRound:
                   "learning_rate": result.config["learning_rate"],
                   "batch_size": result.config["batch_size"],
                   "calibrate_c": bool(calibrate_c),
+                  "weight_smoothing": smoothing, "selection_task": selection_task,
+                  "component_cpu_seconds": cpu,
                   "validation_before": before, "validation_after": after,
                   "hypothesis": hypothesis, "change_summary": change_summary}
         (out / "training.json").write_text(

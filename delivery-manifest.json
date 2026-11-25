@@ -1,0 +1,27 @@
+{
+  "release": "0.16",
+  "source_zip_sha256": "e5b7ad20e3a7de559b5641c80147105a2ed21ddeef7cb1665f16e5f39de0f58b",
+  "zip_files": 180,
+  "tests_after_clean_extraction": 92,
+  "changed_vs_our_v15": [
+    ".dockerignore",
+    "README.md",
+    "SOURCE_README.md",
+    "THIRD_PARTY_LICENSES.md",
+    "docs/04_工程架构与规范.md",
+    "docs/status.md",
+    "docs/交接_2026-11-23.md",
+    "harness.Dockerfile",
+    "harness/contest_submission.py",
+    "release_manifest.json",
+    "reports/v16_构建与验收.md",
+    "reports/v16_比较与交付.md",
+    "scripts/build_source_bundle.py",
+    "scripts/check_release.py",
+    "tests/test_late_budget.py",
+    "tests/test_release_bundle.py"
+  ],
+  "no_new_real_training": true,
+  "platform_or_docker_acceptance": false,
+  "our_v15_prediction_equivalence": "A/B official public baselines; C selected v15 checkpoint; full public validation batch and first64 entry outputs identical"
+}

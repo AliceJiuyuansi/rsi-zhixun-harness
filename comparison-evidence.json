@@ -1,0 +1,63 @@
+{
+  "core_sha256": {
+    "harness/contest_submission.py": {
+      "our_v15": "c37ddd2649c26bdb2a56f5803d6c07e85297b3b909b847b5e0159816b5bf7d87",
+      "teammate_v15": "c37ddd2649c26bdb2a56f5803d6c07e85297b3b909b847b5e0159816b5bf7d87",
+      "v16": "bc1d4542d0798e8f4a712caf6d9943d8c17bb4594d36106cedd3994d09734c2b"
+    },
+    "src/harness/late_budget.py": {
+      "our_v15": "129a35ebee2201156ede99bc376eba7e89e37f318764b659a053915aa2fbb774",
+      "teammate_v15": null,
+      "v16": "129a35ebee2201156ede99bc376eba7e89e37f318764b659a053915aa2fbb774"
+    },
+    "src/harness/round_controller.py": {
+      "our_v15": "88c8fcf5db4ce9d6a2614872a2e4ac9da3dacca66606dd1814670e5bfb7f8998",
+      "teammate_v15": "39290a990509735631f45c62298e4bae6352a5d9c111505355eaea04cbd23895",
+      "v16": "88c8fcf5db4ce9d6a2614872a2e4ac9da3dacca66606dd1814670e5bfb7f8998"
+    },
+    "src/harness/model_receipt.py": {
+      "our_v15": "04f6bf8829cf826ba1592df8787b80fbe26bfafc79b510f66a1dc8562974803d",
+      "teammate_v15": "93b370a410b667875be0451fde5f36d4079f90fbe93defede25b4b9afcf71394",
+      "v16": "04f6bf8829cf826ba1592df8787b80fbe26bfafc79b510f66a1dc8562974803d"
+    },
+    "src/models/official_round.py": {
+      "our_v15": "b78dee55052d64eeee833e6f34e94903b18195dc10e1edadd3c852c72e57e894",
+      "teammate_v15": "864659b58daa5aabada4f49888977f2a09bdf87c02313b0d6d23e7ede35aaf1f",
+      "v16": "b78dee55052d64eeee833e6f34e94903b18195dc10e1edadd3c852c72e57e894"
+    },
+    "vendor/contest_baselines/model.py": {
+      "our_v15": "59833cc4c65771da72756a3ac69a53accb7a9f8e18cbe04a8589263ae38938bd",
+      "teammate_v15": "59833cc4c65771da72756a3ac69a53accb7a9f8e18cbe04a8589263ae38938bd",
+      "v16": "59833cc4c65771da72756a3ac69a53accb7a9f8e18cbe04a8589263ae38938bd"
+    },
+    "vendor/contest_baselines/c_calibration.py": {
+      "our_v15": "a1a66a2bfc20dcfcd38de90811b472dcb4f045b69178ea932a9f599fd36f9c26",
+      "teammate_v15": "13b4768eaa4ca536eadc7b71beeba6ba72b50b2701e8e6706e047bfb1cf75bc5",
+      "v16": "a1a66a2bfc20dcfcd38de90811b472dcb4f045b69178ea932a9f599fd36f9c26"
+    },
+    "vendor/contest_baselines/data.py": {
+      "our_v15": "526b9085e62c7de88f3e24a4bcf6d8de332baf5cb914078a8f2816a25eb87e3b",
+      "teammate_v15": "6dc16a36c811308b3f2b5c13c6a8222834a5c5b7f7fbf0640624acc481b075b7",
+      "v16": "526b9085e62c7de88f3e24a4bcf6d8de332baf5cb914078a8f2816a25eb87e3b"
+    },
+    "harness.Dockerfile": {
+      "our_v15": "784c83de647d61a89b31f44684649f1e04cbf7ed51b24009ac17e6cb2ae2f84e",
+      "teammate_v15": "90565c324bd86e5ec0df45ec38be22846ab94dfdac4209509eb01215d6eea423",
+      "v16": "ada4ed5b99caa663a1e8e5431072972e72beecaeedfa2dca7eb3ae7e47bc8f93"
+    }
+  },
+  "team_source_zip_sha256": "1b8c7c2332b4a149b4d4e1f4763baa58b25c961023b1ae3e0830400681feb91d",
+  "our_source_zip_sha256": "2addfb3f25a81b3ab36ac3cf8cf06e6168ae338ba62069fa4be2a0a87952a8cc",
+  "teammate_ledger_missing_files": [
+    "manifest.json",
+    "platform-v14-rounds.json",
+    "public-C-v14.json",
+    "public-C-v14.log",
+    "public-C-v15.json",
+    "public-C-v15.log",
+    "rsi-zhixun-harness-v15-source.zip",
+    "v15-SwanLab-offline.zip"
+  ],
+  "public_prediction_equivalence": true,
+  "teammate_log_equals_our_old_log": true
+}

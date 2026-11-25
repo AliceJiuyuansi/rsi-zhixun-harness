@@ -67,13 +67,13 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 版本号用于交付记录；预测策略仍随检查点保存。
-RELEASE = os.environ.get("RSI_RELEASE", "0.15")
+RELEASE = os.environ.get("RSI_RELEASE", "0.16")
 
 
 def calibration_enabled(release, override=None):
     """显式0/1优先；未指定时采用对应版本默认值。"""
     if override is None:
-        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2", "0.14", "0.15")
+        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2", "0.14", "0.15", "0.16")
     return override.strip().lower() not in ("0", "false", "no", "off", "")
 
 
@@ -87,7 +87,7 @@ def calibration_mode(release, override=None):
         return "spline_v2"
     if release == "0.9.2":
         return "res_mlp_v1"
-    if release in ("0.14", "0.15"):
+    if release in ("0.14", "0.15", "0.16"):
         return "res_mlp_v2"
     return "v8"
 
@@ -237,7 +237,7 @@ def train(rnd) -> None:
         psi_prev=psi_prev, psi_holdout=max(psi_holdout, psi_baseline if not previous_state else 0.0),
         data_grew=data_grew, stage_changed=stage_changed, gap=metric_state["gap"],
         history=history)
-    late_policy = RELEASE == "0.15" and str(rnd.dataset_key) == "C"
+    late_policy = RELEASE in ("0.15", "0.16") and str(rnd.dataset_key) == "C"
     if late_policy:
         budget = plan_c_budget(budget, idle_rounds=int(previous_state.get("idle_rounds", 0)),
                                kill_switch=history["kill_switch"])
@@ -325,7 +325,7 @@ def train(rnd) -> None:
         try:
             log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
                           f"calibrate_c={calibrate_c} mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
-            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15")
+            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15", "0.16")
             round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
@@ -535,7 +535,7 @@ def train(rnd) -> None:
                            "candidate": {k: round_result.metrics_after[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_after},
                            "smoothing": round_result.config["weight_smoothing"],
                            "component_cpu_seconds": round_result.config["component_cpu_seconds"],
-                       }} if RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15") and round_result is not None else {}),
+                       }} if RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15", "0.16") and round_result is not None else {}),
                        "accepted": bool(outcome and outcome.get("accepted")),
                        "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
                        "promoted": promoted, "gain": None if not outcome else outcome["gain"],
