@@ -1,5 +1,6 @@
 """公开包真实续训/父子状态/逐条预测接线验证；本地替身宿主，不是SDK验收。"""
 import argparse
+import atexit
 import hashlib
 import json
 import os
@@ -17,6 +18,7 @@ def main():
     parser.add_argument("--dataset", choices=["A", "B", "C"], required=True)
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--swanlab", action="store_true", help="训练开始前建立实时离线记录；需要开发用SwanLab")
     args = parser.parse_args()
     if not 1 <= args.rounds <= 10:
         parser.error("rounds must be in 1..10")
@@ -39,6 +41,27 @@ def main():
     history = []
     state_dir = output / "initial-state"
     state_dir.mkdir()
+    swan = None
+    if args.swanlab:
+        for key, name in [("SWANLAB_ROOT", "swanlab-root"), ("SWANLAB_CONFIG_DIR", "swanlab-config"),
+                          ("SWANLAB_SECRETS_DIR", "swanlab-secrets")]:
+            os.environ[key] = str(output/name)
+        import swanlab as swan
+        swan.init(project="rsi-zhixun-paper-c", name=f"public-{args.dataset}-continuation", mode="offline",
+                  log_dir=str(output/"swanlog"), config={"dataset": args.dataset, "rounds": args.rounds,
+                  "checkpoint_sha256": checkpoint_digest(selected), "purpose": "local stub host, real public training",
+                  "calibration_method": os.environ.get("RSI_C_CALIBRATION_METHOD", "config_default")})
+        atexit.register(swan.finish)
+        epoch_sequence = 0
+        original_fit = Model.fit
+        def logged_fit(model, x, y, epochs):
+            nonlocal epoch_sequence
+            losses = original_fit(model, x, y, epochs)
+            epoch_sequence += 1
+            swan.log({"round": round_index, "epoch": int(model.meta["epochs"]),
+                      "loss": float(losses[-1])}, step=epoch_sequence)
+            return losses
+        Model.fit = logged_fit
     results = []
     for round_index in range(1, args.rounds + 1):
         finishes = []
@@ -65,6 +88,8 @@ def main():
         if len(finishes) != 1:
             raise AssertionError("expected one finish per round")
         finish = finishes[0]
+        if finish["configuration"].get("execution", {}).get("status") == "training_error":
+            raise RuntimeError("real training failed; inspect the round log")
         selected_id = finish["selected_artifact_id"]
         selected = artifacts[selected_id]
         state_dir = next_state
@@ -72,11 +97,15 @@ def main():
         data = read_dataset(package/"public/validation.jsonl", task, selected_model.meta["classes"] or None,
                             expected_paths=selected_model.meta["paths"])
         metrics = OfficialRound().evaluate(selected_model, data["x"], data["y"])
+        if swan is not None:
+            swan.log({"round_completed": round_index, **{f"selected/{k}":v for k,v in metrics.items()
+                      if isinstance(v,(int,float))}})
         history.append({"round_index": round_index, "configuration": finish["configuration"],
                         "validation_metrics": metrics, "decision": "promote" if finish["configuration"]["promoted"] else "retain"})
         results.append({"round": round_index, "epochs": finish["configuration"]["epochs"],
                         "promoted": finish["configuration"]["promoted"], "metrics": metrics,
-                        "checkpoint_sha256": checkpoint_digest(selected)})
+                        "checkpoint_sha256": checkpoint_digest(selected),
+                        "configuration": finish["configuration"]})
         print(f"{args.dataset} round={round_index} epochs={results[-1]['epochs']} promoted={results[-1]['promoted']}", flush=True)
 
     batch = selected_model.predict(data["x"])
@@ -99,6 +128,9 @@ def main():
               "validation_sha256": data["sha256"]}
     (output/"result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
     print(json.dumps({"dataset": args.dataset, "metrics": results[-1]["metrics"], "single_vs_batch_max_delta": delta}, ensure_ascii=False), flush=True)
+    if swan is not None:
+        swan.finish()
+        atexit.unregister(swan.finish)
 
 
 if __name__ == "__main__":
