@@ -14,8 +14,9 @@
   2. **B 组轴承跨阶段校准（`vendor/contest_baselines/b_calibration.py`）**：纯训练侧、确定性、逐样本符号一致 `log1p(RUL)` 校准器（`sign_log_v1`），按轴承等权（`bw=1.0`）并用 `alpha=0.80` 与续训 MLP 在 `log1p` 空间几何融合，同时保留 `v16` 的 `b_drift_recovery`。
   3. **C 组后期预算预留 + NASA 门禁放宽（`src/harness/late_budget.py`、`src/harness/round_controller.py`）**：预留 3 epoch 至第 8–10 轮（`limit=12, reserve_epochs=3, release_round=8, idle_threshold=3`），并设置 `c_nasa_tol=0.0015`（允许 `nasa_log1p <= -0.10` 且 RMSE 波动 `>= -0.15%` 晋升），修复第 13 版 Stage 4 R09 拒收问题。
   4. **安全与零回归**：全部校准纯训练侧拟合、不读写验证集标签；`checkpoint.npz` 保持 15 个数组、`<= 16 MiB`，异常或缺失字段自动回退基础 MLP；成对父子零退化门禁保持不变。
+  5. **发布一致性防混包门禁（借鉴 `origin/v16` 并适配 `v17`）**：新增 `release_manifest.json`、`scripts/check_release.py`（支持跨平台行尾归一化 SHA-256、同时校验 `b_calibration` + `c_calibration` + `v17` 开关与 `OfficialRound` 签名）、`scripts/build_source_bundle.py` 及 `tests/test_release_bundle.py`；更新 `.dockerignore` 放行校验脚本与清单，并在 `harness.Dockerfile` 中内置构建期 `--layout image --require-sdk` 预检。
 - **本地验证结果**：
-  - 全量单测 `python -m unittest discover -s tests`：**93 项全部通过**（含 8 项 `tests/test_v17_upgrades.py` 新增单测）。
+  - 全量单测 `python -m unittest discover -s tests`：**100 项全部通过**（含 8 项 `tests/test_v17_upgrades.py` 与 7 项 `tests/test_release_bundle.py`），`python scripts/check_release.py --root .` 返回 `ok: true`。
   - SDK 1.0.4 CLI 验证：`harness.py describe` 退出 0，`harness.py predict` 在 A/B/C 三个检查点逐条与批量预测完全一致（最大差 `< 1e-12`）。
   - 官方公开包 10 轮端到端对比（`0.15` → `0.17`）：
     - **A-gas**：`macro_f1=0.7187`、`acc=0.8859`（一致），训练轮次 `14 → 8` epoch，提示 `731 → 216` 字符，`max_tokens 256 → 64`。

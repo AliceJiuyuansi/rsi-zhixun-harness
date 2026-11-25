@@ -45,6 +45,11 @@ COPY src /app/src
 COPY harness/harness.py /app/harness.py
 COPY harness/contest_submission.py /app/contest_submission.py
 
+# 构建时校验实际 COPY 后的代码、v17 开关与 SDK 导入，防止混合历史版本。
+COPY scripts/check_release.py /app/scripts/check_release.py
+COPY release_manifest.json /app/release_manifest.json
+RUN python3 /app/scripts/check_release.py --root /app --layout image --require-sdk
+
 # 3) 平台约定的挂载点（运行时不写 /app）
 RUN mkdir -p /app /data /previous /state /workspace && chmod 1777 /workspace /tmp
 

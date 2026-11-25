@@ -25,6 +25,10 @@ swanlog/
 !harness/**
 !vendor/
 !vendor/**
+!scripts/
+!scripts/check_release.py
+!release_manifest.json
+!_sdk/
 !_sdk/contest-harness-sdk-1.0.4/
 !_sdk/contest-harness-sdk-1.0.4/**
 
