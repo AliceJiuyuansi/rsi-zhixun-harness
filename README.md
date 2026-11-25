@@ -1,10 +1,15 @@
-# v16 代码候选交付
+# 智训引擎 v16 源码候选
 
-先阅读 `v16_比较与交付.md`。源码 ZIP 已在干净解压目录通过发布预检和 92 项测试。队友 v15 的实际源码存在混合历史模块，不能把它附带的旧测试日志当作本包验证。
+v16 修复两份 v15 的模块与发布一致性。训练/预测策略沿用已验证的我方 v15；不包含新平台成绩、镜像 tar、数据、权重、SDK 或密钥。
 
-本版保留我方可运行 v15 的模型和调度，加入一致性门禁、构建上下文修复和解压验收；A/B/C 指定公开检查点预测保持一致。没有新的平台成绩或镜像 tar。
+- 比较依据与结果：`reports/v16_比较与交付.md`
+- 平台入口：`harness/contest_submission.py`
+- 发布预检：`scripts/check_release.py`；文件清单：`release_manifest.json`
+- 安全导出：`scripts/build_source_bundle.py`（ZIP 解压后预检及完整单测）
+- 92 项测试；SwanLab 历史记录不冒记为新版本实验。
 
-`bundle-check.log` 是最终 ZIP 解压测试日志；`teammate-tests.log` 保留输入包的失败复现，属于比较证据，不是 v16 失败。
-`predictions-*.json` 与 `teammate-checkpoint-compatibility.json` 为公开验证集的只读核对，无隐藏数据。
-构建步骤见 `02-构建与验收.md`；当前 SDK 与 Docker daemon 未就绪，须在具备条件的环境补做验收。
-源码不含官方数据、检查点、密钥或嵌套旧提交包。`our-v15-to-v16.patch` 仅用于完整的我方 v15；建议直接使用新源码 ZIP，勿把单个文件混入队友的旧包。
+先运行 `py -3.12 scripts/check_release.py --root .`，再运行 `py -3.12 -m unittest discover -s tests -v`。
+预检通过但提示缺 SDK 时，只代表源码检查通过；完整协议仍需官方 SDK。
+
+默认版本 0.16，C 为 res_mlp_v2；镜像构建仍需 `_sdk/contest-harness-sdk-1.0.4`。
+Dockerfile 构建后会执行预检；实际镜像/断网协议未在当前机器完成验收。
