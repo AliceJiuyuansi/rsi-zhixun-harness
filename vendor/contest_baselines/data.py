@@ -95,11 +95,15 @@ def read_dataset(path, task, classes=None, expected_paths=None):
             raise ValueError("unsupported task")
         ids.append(identity); seen.add(identity); features.append(values); targets.append(target)
         # 仅用于验证分组报告，不进入输入特征或标准化。
-        meta = row.get("meta")
-        group = meta.get("bearing") if isinstance(meta, dict) else None
+        meta = row.get("meta") if isinstance(row.get("meta"), dict) else {}
+        group = meta.get("source_subset") or meta.get("bearing")
         if not isinstance(group, str) or not group.strip():
             match = re.fullmatch(r"xjtu_(Bearing\d+_\d+)_s\d+", identity)
             group = match.group(1) if match else None
+        if not isinstance(group, str) or not group.strip():
+            # C-MAPSS: FD001..FD004 from the sample id when meta does not carry it.
+            match = re.search(r"(?i)(fd00[1-4])", identity)
+            group = match.group(1).upper() if match else None
         groups.append(group)
     if not ids:
         raise ValueError("dataset is empty")
