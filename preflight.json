@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "release": "0.16",
+  "layout": "source",
+  "ok": true,
+  "errors": [],
+  "warnings": [
+    "sdk_not_checked:source_check_is_not_sdk_acceptance"
+  ],
+  "sdk_available": false,
+  "checkpoint": {
+    "task": "regression",
+    "calibration": "res_mlp_v2",
+    "sha256": "f6c42302a8b81267874bed57621bae72b207d3bc078c4bfb55b36136b223a887"
+  }
+}
