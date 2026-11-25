@@ -1,0 +1,50 @@
+C:\Users\27437\Documents\Codex\2026-11-23\codex-url-9-agent-github-https-2\work\update-2026-11-24\dev-swanlab\pydantic_settings\sources\providers\secrets.py:75: UserWarning: directory "C:\Users\27437\Documents\Codex\2026-11-23\codex-url-9-agent-github-https-2\work\update-2026-11-25\public-C-v14\swanlab-secrets" does not exist
+  warnings.warn(f'directory "{path}" does not exist')  # noqa: B028
+swanlab: Tracking run with swanlab version 0.10.6
+swanlab: 💾 Run data saved at 
+C:\Users\27437\Documents\Codex\2026-11-23\codex-url-9-agent-github-https-2\work
+\update-2026-11-25\public-C-v14\swanlog\run-20261125_113158-e1e1033t
+swanlab: ⚡️ Run `swanlab sync 
+C:\Users\27437\Documents\Codex\2026-11-23\codex-url-9-agent-github-https-2\work
+\update-2026-11-25\public-C-v14\swanlog\run-20261125_113158-e1e1033t` to sync 
+this run
+[submission] round 1: rows=113089 psi_prev=0.000 stage_changed=True rule=first_round model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.002 calibrate_c=True mode=res_mlp_v2
+[submission] 第1轮（C-fixed-public-stage）：首轮：在父检查点上做一次真实续训，给后续轮次一个可比较的起点。历史：无历史轮次。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 52.868573→46.858642 gain=+0.1137；提交新候选。
+C round=1 epochs=3 promoted=True
+[submission] round 2: rows=113089 psi_prev=0.000 stage_changed=False rule=calibration model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.001 calibrate_c=True mode=res_mlp_v2
+[submission] 第2轮（C-fixed-public-stage）：上一轮有正收益(+0.113677)，用 3 个 epoch 做廉价校准。历史：第1轮 promote(epochs=3, gain=0.113677)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 46.858642→46.708092 gain=+0.0032；提交新候选。
+C round=2 epochs=3 promoted=True
+[submission] round 3: rows=113089 psi_prev=0.000 stage_changed=False rule=calibration model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.001 calibrate_c=True mode=res_mlp_v2
+[submission] 第3轮（C-fixed-public-stage）：上一轮有正收益(+0.003213)，用 3 个 epoch 做廉价校准。历史：第1轮 promote(epochs=3, gain=0.113677)；第2轮 promote(epochs=3, gain=0.003213)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 46.708092→46.614428 gain=+0.0020；提交新候选。
+C round=3 epochs=3 promoted=True
+[submission] round 4: rows=113089 psi_prev=0.000 stage_changed=False rule=calibration model=unavailable source=rule model_status=empty budget=3ep
+[submission] training: epochs=3 lr=0.001 calibrate_c=True mode=res_mlp_v2
+[submission] candidate kept aside: before={'mae': 33.433625001392286, 'rmse': 46.61442837667064, 'nasa': 802992787.831574, 'nasa_log1p': 20.503856291586246, 'nasa_saturated': False, 'by_group': {np.str_('FD001'): {'rows': 3210, 'mae': 29.218442323377865, 'rmse': 38.71992430334933}, np.str_('FD002'): {'rows': 7581, 'mae': 30.23702412364287, 'rmse': 40.1838835095257}, np.str_('FD003'): {'rows': 3555, 'mae': 30.534361610619296, 'rmse': 43.15417368792912}, np.str_('FD004'): {'rows': 8703, 'mae': 38.957128276681566, 'rmse': 55.08598599632456}}, 'group_rows': 23049, 'ungrouped_rows': 0} after={'mae': 33.539186589207496, 'rmse': 46.643146762152476, 'nasa': 864095716.0802249, 'nasa_log1p': 20.57719410428994, 'nasa_saturated': False, 'by_group': {np.str_('FD001'): {'rows': 3210, 'mae': 29.42173885057967, 'rmse': 38.84811546691001}, np.str_('FD002'): {'rows': 7581, 'mae': 30.410468341571267, 'rmse': 40.235311207112474}, np.str_('FD003'): {'rows': 3555, 'mae': 30.55912380918601, 'rmse': 43.19784455405583}, np.str_('FD004'): {'rows': 8703, 'mae': 39.00051526429675, 'rmse': 55.07039368376439}}, 'group_rows': 23049, 'ungrouped_rows': 0} outcome={'metric': 'rmse', 'before': 46.614428, 'after': 46.643147, 'gain': -0.000616, 'accepted': False, 'promote': False}
+[submission] 第4轮（C-fixed-public-stage）：上一轮有正收益(+0.002005)，用 3 个 epoch 做廉价校准。历史：第1轮 promote(epochs=3, gain=0.113677)；第2轮 promote(epochs=3, gain=0.003213)；第3轮 promote(epochs=3, gain=0.002005)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 46.614428→46.643147 gain=-0.0006；保持父模型。
+C round=4 epochs=3 promoted=False
+[submission] round 5: rows=113089 psi_prev=0.000 stage_changed=False rule=quiet model=unavailable source=rule model_status=empty budget=0ep
+[submission] 第5轮（C-fixed-public-stage）：无新阶段、无显著漂移、上轮无正收益；本轮只观察，不花算力。历史：第2轮 promote(epochs=3, gain=0.003213)；第3轮 promote(epochs=3, gain=0.002005)；第4轮 retain(epochs=3, gain=-0.000616)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 46.6144；保持父模型；训练异常=no training this round (policy or gate chose none)。
+C round=5 epochs=0 promoted=False
+[submission] round 6: rows=113089 psi_prev=0.000 stage_changed=False rule=quiet model=unavailable source=rule model_status=empty budget=0ep
+[submission] 第6轮（C-fixed-public-stage）：无新阶段、无显著漂移、上轮无正收益；本轮只观察，不花算力。历史：第3轮 promote(epochs=3, gain=0.002005)；第4轮 retain(epochs=3, gain=-0.000616)；第5轮 retain(epochs=0, gain=None)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 46.6144；保持父模型；训练异常=no training this round (policy or gate chose none)。
+C round=6 epochs=0 promoted=False
+[submission] round 7: rows=113089 psi_prev=0.000 stage_changed=False rule=quiet model=unavailable source=rule model_status=empty budget=0ep
+[submission] 第7轮（C-fixed-public-stage）：无新阶段、无显著漂移、上轮无正收益；本轮只观察，不花算力。历史：第4轮 retain(epochs=3, gain=-0.000616)；第5轮 retain(epochs=0, gain=None)；第6轮 retain(epochs=0, gain=None)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 46.6144；保持父模型；训练异常=no training this round (policy or gate chose none)。
+C round=7 epochs=0 promoted=False
+[submission] round 8: rows=113089 psi_prev=0.000 stage_changed=False rule=quiet model=unavailable source=rule model_status=empty budget=0ep
+[submission] 第8轮（C-fixed-public-stage）：无新阶段、无显著漂移、上轮无正收益；本轮只观察，不花算力。历史：第5轮 retain(epochs=0, gain=None)；第6轮 retain(epochs=0, gain=None)；第7轮 retain(epochs=0, gain=None)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 46.6144；保持父模型；训练异常=no training this round (policy or gate chose none)。
+C round=8 epochs=0 promoted=False
+[submission] round 9: rows=113089 psi_prev=0.000 stage_changed=False rule=quiet model=unavailable source=rule model_status=empty budget=0ep
+[submission] 第9轮（C-fixed-public-stage）：无新阶段、无显著漂移、上轮无正收益；本轮只观察，不花算力。历史：第6轮 retain(epochs=0, gain=None)；第7轮 retain(epochs=0, gain=None)；第8轮 retain(epochs=0, gain=None)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 46.6144；保持父模型；训练异常=no training this round (policy or gate chose none)。
+C round=9 epochs=0 promoted=False
+[submission] round 10: rows=113089 psi_prev=0.000 stage_changed=False rule=quiet model=unavailable source=rule model_status=empty budget=0ep
+[submission] 第10轮（C-fixed-public-stage）：无新阶段、无显著漂移、上轮无正收益；本轮只观察，不花算力。历史：第7轮 retain(epochs=0, gain=None)；第8轮 retain(epochs=0, gain=None)；第9轮 retain(epochs=0, gain=None)。漂移：PSI(上轮)=0.000 PSI(基线)=0.000 PSI(训/验)=0.008 预测JS=0.000。模型裁决：unavailable（无文本，按规则执行）。结果：rmse 保持 46.6144；保持父模型；训练异常=no training this round (policy or gate chose none)。
+C round=10 epochs=0 promoted=False
+{"dataset": "C", "metrics": {"mae": 33.433625001392286, "rmse": 46.61442837667064, "nasa": 802992787.831574, "nasa_log1p": 20.503856291586246, "nasa_saturated": false}, "single_vs_batch_max_delta": 1.9895196601282805e-13}
+swanlab: ⚡️ Run `swanlab sync 
+C:\Users\27437\Documents\Codex\2026-11-23\codex-url-9-agent-github-https-2\work
+\update-2026-11-25\public-C-v14\swanlog\run-20261125_113158-e1e1033t` to sync 
+this run

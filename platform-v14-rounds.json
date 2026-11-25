@@ -1,0 +1,2189 @@
+{
+  "source": "大学生“人工智能+”创新大赛-9.html",
+  "sha256": "72e36cdd3927570c70f25789059e160d0873b90a3856bc8c2403469906d345f4",
+  "configurations": [
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 5,
+      "gain": 0.004706,
+      "gate": true,
+      "history": [],
+      "lr": 0.002,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0,
+      "psi_holdout": 2.2275,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 445,
+        "validation": 1244
+      },
+      "rule": "first_round",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.7187354630392223
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.31999999999999984,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.11999999999999966
+        },
+        "parent": {
+          "macro_f1": 0.7140297220788709
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 1,
+      "gain": 0,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 5,
+          "gain": 0.004706,
+          "round": 1,
+          "value": 0.718735
+        }
+      ],
+      "lr": 0.001,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0,
+      "psi_holdout": 2.2275,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 445,
+        "validation": 1244
+      },
+      "rule": "a_v1_quiet",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.7187354630392223
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.31999999999999984,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.06000000000000005
+        },
+        "parent": {
+          "macro_f1": 0.7187354630392223
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": 0.134865,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 5,
+          "gain": 0.004706,
+          "round": 1,
+          "value": 0.718735
+        },
+        {
+          "decision": "promote",
+          "epochs": 1,
+          "gain": 0,
+          "round": 2,
+          "value": 0.718735
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0195,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0.5731,
+      "psi_holdout": 0.6285,
+      "psi_prev": 0.5731,
+      "release": "0.14",
+      "rows": {
+        "train": 952,
+        "validation": 1371
+      },
+      "rule": "a_v1_fresh",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.8377926592734178
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.45999999999999996,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0.040000000000000036,
+          "validation": 0.1299999999999999
+        },
+        "parent": {
+          "macro_f1": 0.7029274446367335
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 1,
+      "gain": 0.025948,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 5,
+          "gain": 0.004706,
+          "round": 1,
+          "value": 0.718735
+        },
+        {
+          "decision": "promote",
+          "epochs": 1,
+          "gain": 0,
+          "round": 2,
+          "value": 0.718735
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.134865,
+          "round": 3,
+          "value": 0.837793
+        }
+      ],
+      "lr": 0.001,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0.5731,
+      "psi_holdout": 0.6285,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 952,
+        "validation": 1371
+      },
+      "rule": "a_v1_quiet",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.8637409746360439
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.2999999999999998,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0.040000000000000036,
+          "validation": 0.040000000000000036
+        },
+        "parent": {
+          "macro_f1": 0.8377926592734178
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": 0.049453,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 1,
+          "gain": 0,
+          "round": 2,
+          "value": 0.718735
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.134865,
+          "round": 3,
+          "value": 0.837793
+        },
+        {
+          "decision": "promote",
+          "epochs": 1,
+          "gain": 0.025948,
+          "round": 4,
+          "value": 0.863741
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0031,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0.6447,
+      "psi_holdout": 0.6161,
+      "psi_prev": 0.0065,
+      "release": "0.14",
+      "rows": {
+        "train": 1003,
+        "validation": 1384
+      },
+      "rule": "a_v1_fresh",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.9081176233805452
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.2400000000000002,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0.040000000000000036,
+          "validation": 0.08999999999999986
+        },
+        "parent": {
+          "macro_f1": 0.8586642342288059
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": 0.008951,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.134865,
+          "round": 3,
+          "value": 0.837793
+        },
+        {
+          "decision": "promote",
+          "epochs": 1,
+          "gain": 0.025948,
+          "round": 4,
+          "value": 0.863741
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.049453,
+          "round": 5,
+          "value": 0.908118
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0043,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0.7465,
+      "psi_holdout": 0.5744,
+      "psi_prev": 0.0108,
+      "release": "0.14",
+      "rows": {
+        "train": 1065,
+        "validation": 1400
+      },
+      "rule": "a_v1_fresh",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.9123467360067887
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.3899999999999997,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.08000000000000007
+        },
+        "parent": {
+          "macro_f1": 0.903395688652401
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": 0.135853,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 1,
+          "gain": 0.025948,
+          "round": 4,
+          "value": 0.863741
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.049453,
+          "round": 5,
+          "value": 0.908118
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.008951,
+          "round": 6,
+          "value": 0.912347
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0191,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 1.2491,
+      "psi_holdout": 0.5524,
+      "psi_prev": 0.3821,
+      "release": "0.14",
+      "rows": {
+        "train": 1801,
+        "validation": 1584
+      },
+      "rule": "a_v1_fresh",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.9595682302999937
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.40000000000000036,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0.040000000000000036,
+          "validation": 0.08999999999999986
+        },
+        "parent": {
+          "macro_f1": 0.8237147816773284
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": 0.052627,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.049453,
+          "round": 5,
+          "value": 0.908118
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.008951,
+          "round": 6,
+          "value": 0.912347
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.135853,
+          "round": 7,
+          "value": 0.959568
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0495,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 1.806,
+      "psi_holdout": 0.49,
+      "psi_prev": 0.1585,
+      "release": "0.14",
+      "rows": {
+        "train": 2957,
+        "validation": 1873
+      },
+      "rule": "a_v1_fresh",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.9626725197786805
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6899999999999995,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0.040000000000000036,
+          "validation": 0.1200000000000001
+        },
+        "parent": {
+          "macro_f1": 0.9100453546234119
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": 0.016669,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.008951,
+          "round": 6,
+          "value": 0.912347
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.135853,
+          "round": 7,
+          "value": 0.959568
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.052627,
+          "round": 8,
+          "value": 0.962673
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0058,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 1.8267,
+      "psi_holdout": 0.4863,
+      "psi_prev": 0.0047,
+      "release": "0.14",
+      "rows": {
+        "train": 3050,
+        "validation": 1897
+      },
+      "rule": "a_v1_fresh",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.9721011830934643
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6200000000000001,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.1200000000000001
+        },
+        "parent": {
+          "macro_f1": 0.9554326075951988
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": 0.008707,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.135853,
+          "round": 7,
+          "value": 0.959568
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.052627,
+          "round": 8,
+          "value": 0.962673
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.016669,
+          "round": 9,
+          "value": 0.972101
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0078,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 1.886,
+      "psi_holdout": 0.475,
+      "psi_prev": 0.0093,
+      "release": "0.14",
+      "rows": {
+        "train": 3200,
+        "validation": 1935
+      },
+      "rule": "a_v1_fresh",
+      "selection_audit": {
+        "candidate": {
+          "macro_f1": 0.9697069652281534
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6799999999999997,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.08000000000000007
+        },
+        "parent": {
+          "macro_f1": 0.9609998941408247
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 5,
+      "gain": 0.030494,
+      "gate": true,
+      "history": [],
+      "lr": 0.002,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0,
+      "psi_holdout": 6.9622,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7032,
+        "validation": 1679
+      },
+      "rule": "first_round",
+      "selection_audit": {
+        "candidate": {
+          "rmse": 660.3886889170046
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6500000000000004,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.13000000000000078
+        },
+        "parent": {
+          "rmse": 681.1598326043113
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 3,
+      "gain": 0.008206,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 5,
+          "gain": 0.030494,
+          "round": 1,
+          "value": 660.388689
+        }
+      ],
+      "lr": 0.001,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0,
+      "psi_holdout": 6.9622,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7032,
+        "validation": 1679
+      },
+      "rule": "calibration",
+      "selection_audit": {
+        "candidate": {
+          "rmse": 654.9693622975001
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.7600000000000007,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0.040000000000000036,
+          "validation": 0.07999999999999918
+        },
+        "parent": {
+          "rmse": 660.3886889170046
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 3,
+      "gain": -0.012684,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 5,
+          "gain": 0.030494,
+          "round": 1,
+          "value": 660.388689
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.008206,
+          "round": 2,
+          "value": 654.969362
+        }
+      ],
+      "lr": 0.001,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0,
+      "psi_holdout": 6.9622,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7032,
+        "validation": 1679
+      },
+      "rule": "calibration",
+      "selection_audit": {
+        "candidate": {
+          "rmse": 663.2772740072934
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6700000000000008,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.04999999999999982
+        },
+        "parent": {
+          "rmse": 654.9693622975001
+        },
+        "smoothing": "selected"
+      },
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "none",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 0,
+      "gain": null,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 5,
+          "gain": 0.030494,
+          "round": 1,
+          "value": 660.388689
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.008206,
+          "round": 2,
+          "value": 654.969362
+        },
+        {
+          "decision": "retain",
+          "epochs": 3,
+          "gain": -0.012684,
+          "round": 3,
+          "value": 654.969362
+        }
+      ],
+      "lr": 0,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0,
+      "psi_holdout": 6.9622,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7032,
+        "validation": 1679
+      },
+      "rule": "quiet",
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 4,
+      "gain": -0.021253,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.008206,
+          "round": 2,
+          "value": 654.969362
+        },
+        {
+          "decision": "retain",
+          "epochs": 3,
+          "gain": -0.012684,
+          "round": 3,
+          "value": 654.969362
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 4,
+          "value": 654.969362
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0017,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0,
+      "psi_holdout": 6.9494,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7048,
+        "validation": 1683
+      },
+      "rule": "new_stage",
+      "selection_audit": {
+        "candidate": {
+          "rmse": 669.1673736571776
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6099999999999994,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.13000000000000078
+        },
+        "parent": {
+          "rmse": 655.2412862079965
+        },
+        "smoothing": "selected"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": false,
+      "action": "none",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 0,
+      "gain": null,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 3,
+          "gain": -0.012684,
+          "round": 3,
+          "value": 654.969362
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 4,
+          "value": 654.969362
+        },
+        {
+          "decision": "retain",
+          "epochs": 4,
+          "gain": -0.021253,
+          "round": 5,
+          "value": 655.241286
+        }
+      ],
+      "lr": 0,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0,
+      "psi_holdout": 6.9494,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7048,
+        "validation": 1683
+      },
+      "rule": "stalled",
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "none",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 0,
+      "gain": null,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 4,
+          "value": 654.969362
+        },
+        {
+          "decision": "retain",
+          "epochs": 4,
+          "gain": -0.021253,
+          "round": 5,
+          "value": 655.241286
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 6,
+          "value": 655.241286
+        }
+      ],
+      "lr": 0,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0,
+      "psi_holdout": 6.9494,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7048,
+        "validation": 1683
+      },
+      "rule": "stalled",
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 4,
+      "gain": 0.003328,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 4,
+          "gain": -0.021253,
+          "round": 5,
+          "value": 655.241286
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 6,
+          "value": 655.241286
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 7,
+          "value": 655.241286
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0069,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0.0016,
+      "psi_holdout": 6.9194,
+      "psi_prev": 0.0015,
+      "release": "0.14",
+      "rows": {
+        "train": 7156,
+        "validation": 1710
+      },
+      "rule": "new_stage",
+      "selection_audit": {
+        "candidate": {
+          "rmse": 655.7476099351368
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6800000000000006,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0.040000000000000036,
+          "validation": 0.15999999999999925
+        },
+        "parent": {
+          "rmse": 657.9375447023833
+        },
+        "smoothing": "selected"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 3,
+      "gain": 0.004564,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 6,
+          "value": 655.241286
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 7,
+          "value": 655.241286
+        },
+        {
+          "decision": "promote",
+          "epochs": 4,
+          "gain": 0.003328,
+          "round": 8,
+          "value": 655.74761
+        }
+      ],
+      "lr": 0.001,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0.0016,
+      "psi_holdout": 6.9194,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7156,
+        "validation": 1710
+      },
+      "rule": "calibration",
+      "selection_audit": {
+        "candidate": {
+          "rmse": 652.7549854025873
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6799999999999997,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0.040000000000000036,
+          "validation": 0.16000000000000014
+        },
+        "parent": {
+          "rmse": 655.7476099351368
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "finetune",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 3,
+      "gain": -0.008816,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 7,
+          "value": 655.241286
+        },
+        {
+          "decision": "promote",
+          "epochs": 4,
+          "gain": 0.003328,
+          "round": 8,
+          "value": 655.74761
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.004564,
+          "round": 9,
+          "value": 652.754985
+        }
+      ],
+      "lr": 0.001,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0.0016,
+      "psi_holdout": 6.9194,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 7156,
+        "validation": 1710
+      },
+      "rule": "calibration",
+      "selection_audit": {
+        "candidate": {
+          "rmse": 658.5098494873112
+        },
+        "component_cpu_seconds": {
+          "calibration": 0,
+          "fit": 0.6500000000000004,
+          "smoothed_calibration": 0,
+          "smoothed_validation": 0,
+          "validation": 0.16000000000000014
+        },
+        "parent": {
+          "rmse": 652.7549854025873
+        },
+        "smoothing": "selected"
+      },
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": true,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": 0.113677,
+      "gate": true,
+      "history": [],
+      "lr": 0.002,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0,
+      "psi_holdout": 0.0076,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 113089,
+        "validation": 23049
+      },
+      "rule": "first_round",
+      "selection_audit": {
+        "candidate": {
+          "nasa_log1p": 20.63782822143531,
+          "rmse": 46.85864101677424
+        },
+        "component_cpu_seconds": {
+          "calibration": 26.680000000000003,
+          "fit": 1.8099999999999916,
+          "smoothed_calibration": 13.370000000000005,
+          "smoothed_validation": 0.9899999999999949,
+          "validation": 2.830000000000009
+        },
+        "parent": {
+          "nasa_log1p": 22.485156873691214,
+          "rmse": 52.86857256611151
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": true,
+      "data_grew": false,
+      "epochs": 3,
+      "gain": 0.003213,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.113677,
+          "round": 1,
+          "value": 46.858641
+        }
+      ],
+      "lr": 0.001,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0,
+      "psi_holdout": 0.0076,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 113089,
+        "validation": 23049
+      },
+      "rule": "calibration",
+      "selection_audit": {
+        "candidate": {
+          "nasa_log1p": 20.6419434212415,
+          "rmse": 46.70809165523008
+        },
+        "component_cpu_seconds": {
+          "calibration": 28.009999999999994,
+          "fit": 1.7399999999999949,
+          "smoothed_calibration": 13.239999999999995,
+          "smoothed_validation": 0.980000000000004,
+          "validation": 3.2800000000000047
+        },
+        "parent": {
+          "nasa_log1p": 20.63782822143531,
+          "rmse": 46.85864101677424
+        },
+        "smoothing": "kept_original"
+      },
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": true,
+      "action": "finetune",
+      "calibrate_c": true,
+      "data_grew": false,
+      "epochs": 3,
+      "gain": 0.002005,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.113677,
+          "round": 1,
+          "value": 46.858641
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.003213,
+          "round": 2,
+          "value": 46.708092
+        }
+      ],
+      "lr": 0.001,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": true,
+      "psi_baseline": 0,
+      "psi_holdout": 0.0076,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 113089,
+        "validation": 23049
+      },
+      "rule": "calibration",
+      "selection_audit": {
+        "candidate": {
+          "nasa_log1p": 20.503856194970936,
+          "rmse": 46.61442779505684
+        },
+        "component_cpu_seconds": {
+          "calibration": 42.09,
+          "fit": 1.6300000000000026,
+          "smoothed_calibration": 13.530000000000001,
+          "smoothed_validation": 0.9100000000000108,
+          "validation": 3.7399999999999984
+        },
+        "parent": {
+          "nasa_log1p": 20.6419434212415,
+          "rmse": 46.70809165523008
+        },
+        "smoothing": "selected"
+      },
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "finetune",
+      "calibrate_c": true,
+      "data_grew": true,
+      "epochs": 3,
+      "gain": -0.003891,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.113677,
+          "round": 1,
+          "value": 46.858641
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.003213,
+          "round": 2,
+          "value": 46.708092
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.002005,
+          "round": 3,
+          "value": 46.614428
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0019,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0.0002,
+      "psi_holdout": 0.0076,
+      "psi_prev": 0.0002,
+      "release": "0.14",
+      "rows": {
+        "train": 114141,
+        "validation": 23313
+      },
+      "rule": "c_stage_probe",
+      "selection_audit": {
+        "candidate": {
+          "nasa_log1p": 20.624995099521133,
+          "rmse": 46.79951252568697
+        },
+        "component_cpu_seconds": {
+          "calibration": 42.83,
+          "fit": 1.6000000000000014,
+          "smoothed_calibration": 13.310000000000002,
+          "smoothed_validation": 0.9799999999999898,
+          "validation": 3.930000000000007
+        },
+        "parent": {
+          "nasa_log1p": 20.50492400320594,
+          "rmse": 46.61813796968729
+        },
+        "smoothing": "selected"
+      },
+      "source": "rule",
+      "stage_changed": true
+    },
+    {
+      "accepted": false,
+      "action": "none",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 0,
+      "gain": null,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.003213,
+          "round": 2,
+          "value": 46.708092
+        },
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.002005,
+          "round": 3,
+          "value": 46.614428
+        },
+        {
+          "decision": "retain",
+          "epochs": 3,
+          "gain": -0.003891,
+          "round": 4,
+          "value": 46.618138
+        }
+      ],
+      "lr": 0,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0.0002,
+      "psi_holdout": 0.0076,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 114141,
+        "validation": 23313
+      },
+      "rule": "quiet",
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "none",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 0,
+      "gain": null,
+      "gate": true,
+      "history": [
+        {
+          "decision": "promote",
+          "epochs": 3,
+          "gain": 0.002005,
+          "round": 3,
+          "value": 46.614428
+        },
+        {
+          "decision": "retain",
+          "epochs": 3,
+          "gain": -0.003891,
+          "round": 4,
+          "value": 46.618138
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 5,
+          "value": 46.618138
+        }
+      ],
+      "lr": 0,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0.0002,
+      "psi_holdout": 0.0076,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 114141,
+        "validation": 23313
+      },
+      "rule": "quiet",
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "finetune",
+      "calibrate_c": true,
+      "data_grew": true,
+      "epochs": 1,
+      "gain": -0.0075,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 3,
+          "gain": -0.003891,
+          "round": 4,
+          "value": 46.618138
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 5,
+          "value": 46.618138
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 6,
+          "value": 46.618138
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0031,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0.0001,
+      "psi_holdout": 0.0072,
+      "psi_prev": 0.0002,
+      "release": "0.14",
+      "rows": {
+        "train": 116746,
+        "validation": 23965
+      },
+      "rule": "epoch_limit",
+      "selection_audit": {
+        "candidate": {
+          "nasa_log1p": 20.85568175696067,
+          "rmse": 46.83053673882192
+        },
+        "component_cpu_seconds": {
+          "calibration": 14.7,
+          "fit": 0.5899999999999999,
+          "smoothed_calibration": 14.57,
+          "smoothed_validation": 0.9299999999999997,
+          "validation": 1.620000000000001
+        },
+        "parent": {
+          "nasa_log1p": 20.505398807010955,
+          "rmse": 46.48190909765876
+        },
+        "smoothing": "selected"
+      },
+      "source": "budget",
+      "stage_changed": true
+    },
+    {
+      "accepted": false,
+      "action": "none",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 0,
+      "gain": null,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 5,
+          "value": 46.618138
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 6,
+          "value": 46.618138
+        },
+        {
+          "decision": "retain",
+          "epochs": 1,
+          "gain": -0.0075,
+          "round": 7,
+          "value": 46.481909
+        }
+      ],
+      "lr": 0,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0.0001,
+      "psi_holdout": 0.0072,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 116746,
+        "validation": 23965
+      },
+      "rule": "stalled",
+      "source": "rule",
+      "stage_changed": false
+    },
+    {
+      "accepted": false,
+      "action": "none",
+      "calibrate_c": false,
+      "data_grew": true,
+      "epochs": 0,
+      "gain": null,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 6,
+          "value": 46.618138
+        },
+        {
+          "decision": "retain",
+          "epochs": 1,
+          "gain": -0.0075,
+          "round": 7,
+          "value": 46.481909
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 8,
+          "value": 46.481909
+        }
+      ],
+      "lr": 0.0015,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0.0009,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0.0002,
+      "psi_holdout": 0.0068,
+      "psi_prev": 0.0002,
+      "release": "0.14",
+      "rows": {
+        "train": 117909,
+        "validation": 24256
+      },
+      "rule": "epoch_limit",
+      "source": "budget",
+      "stage_changed": true
+    },
+    {
+      "accepted": false,
+      "action": "none",
+      "calibrate_c": false,
+      "data_grew": false,
+      "epochs": 0,
+      "gain": null,
+      "gate": true,
+      "history": [
+        {
+          "decision": "retain",
+          "epochs": 1,
+          "gain": -0.0075,
+          "round": 7,
+          "value": 46.481909
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 8,
+          "value": 46.481909
+        },
+        {
+          "decision": "retain",
+          "epochs": 0,
+          "gain": null,
+          "round": 9,
+          "value": 46.82803
+        }
+      ],
+      "lr": 0,
+      "model_action": "unavailable",
+      "model_receipt": {
+        "changed_rule": false,
+        "error_type": "",
+        "finish_reason": "length",
+        "max_tokens": 768,
+        "response_keys": [
+          "choices",
+          "created",
+          "id",
+          "model",
+          "object",
+          "usage"
+        ],
+        "status": "empty",
+        "text_chars": 0,
+        "text_source": ""
+      },
+      "pred_js": 0,
+      "prediction_policy": "nonnegative_unbounded",
+      "promoted": false,
+      "psi_baseline": 0.0002,
+      "psi_holdout": 0.0068,
+      "psi_prev": 0,
+      "release": "0.14",
+      "rows": {
+        "train": 117909,
+        "validation": 24256
+      },
+      "rule": "stalled",
+      "source": "rule",
+      "stage_changed": false
+    }
+  ]
+}
