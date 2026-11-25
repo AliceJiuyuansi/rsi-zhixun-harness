@@ -34,6 +34,7 @@ PLATFORM_APP_DIR = Path(os.environ.get("CONTEST_APP", "/app"))
 if str(PLATFORM_APP_DIR) not in sys.path:
     sys.path.insert(0, str(PLATFORM_APP_DIR))
 
+from src.harness.late_budget import (plan_c_budget, protect_c_attempt, pace_c_budget, execution_record)
 from src.harness.guard import Gatekeeper  # noqa: E402
 from src.harness.model_receipt import decide_with_receipt  # noqa: E402
 from src.harness.round_controller import (  # noqa: E402
@@ -44,6 +45,7 @@ from src.harness.round_controller import (  # noqa: E402
     feature_profile,
     js_divergence,
     metric_value,
+    paired_acceptance,
     prediction_profile,
     psi_against,
     row_observation,
@@ -64,18 +66,34 @@ WORKSPACE = Path(os.environ.get("CONTEST_WORK", "/workspace"))
 STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
-# 本地与镜像默认均采用 v7 策略；预测本身不再依赖发布环境变量。
-RELEASE = os.environ.get("RSI_RELEASE", "0.7.1")
+# 版本号用于交付记录；预测策略仍随检查点保存。
+RELEASE = os.environ.get("RSI_RELEASE", "0.15")
 
 
 def calibration_enabled(release, override=None):
     """显式0/1优先；未指定时采用对应版本默认值。"""
     if override is None:
-        return release in ("0.7", "0.7.1")
+        return release in ("0.7", "0.7.1", "0.8", "0.9", "0.9.1", "0.9.2", "0.14", "0.15")
     return override.strip().lower() not in ("0", "false", "no", "off", "")
 
 
+def calibration_mode(release, override=None):
+    """C 校准器模式：显式 RSI_C_CAL_MODE 优先，否则按 RELEASE 选择。"""
+    if override is not None and override.strip():
+        mode = override.strip().lower()
+        if mode in ("v8", "spline_v2", "res_mlp_v1", "res_mlp_v2"):
+            return mode
+    if release == "0.9.1":
+        return "spline_v2"
+    if release == "0.9.2":
+        return "res_mlp_v1"
+    if release in ("0.14", "0.15"):
+        return "res_mlp_v2"
+    return "v8"
+
+
 C_CALIBRATION_ENABLED = calibration_enabled(RELEASE, os.environ.get("RSI_C_CALIBRATION"))
+C_CALIBRATION_MODE = calibration_mode(RELEASE, os.environ.get("RSI_C_CAL_MODE"))
 STATE_SCHEMA = 3
 
 
@@ -138,8 +156,9 @@ def _metric_state(previous: dict, before: dict, task: str) -> dict:
 
 def _model_prompt(payload: dict) -> str:
     return (
+        "/no_think\n"
         "你是工业模型自进化系统的决策器。下面是一轮的真实状态（JSON）。\n"
-        "请只输出一行 JSON，不要解释，不要 Markdown：\n"
+        "请第一行直接输出唯一一行 JSON，不要思考过程，不要解释，不要 Markdown：\n"
         '{"decision":"train|hold","epochs":0-3,"lr":0.0005-0.003,"reason":"不超过60字"}\n'
         "规则：新阶段数据到达且有漂移时可 train；连续多轮无收益、或没有新数据且指标稳定时 hold；"
         "绝不建议超过规则预算的 epochs。\n"
@@ -177,7 +196,8 @@ def train(rnd) -> None:
     validation_rows = int(len(validation_dataset["ids"]))
 
     trainer = OfficialRound()
-    validation_groups = validation_dataset["groups"] if rnd.dataset_key == "B" else None
+    validation_groups = (validation_dataset["groups"]
+                         if rnd.dataset_key in ("B", "C") else None)
     validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
                                          validation_dataset["y"], groups=validation_groups)
     metric_state = _metric_state(previous_state, validation_before, task)
@@ -217,6 +237,10 @@ def train(rnd) -> None:
         psi_prev=psi_prev, psi_holdout=max(psi_holdout, psi_baseline if not previous_state else 0.0),
         data_grew=data_grew, stage_changed=stage_changed, gap=metric_state["gap"],
         history=history)
+    late_policy = RELEASE == "0.15" and str(rnd.dataset_key) == "C"
+    if late_policy:
+        budget = plan_c_budget(budget, idle_rounds=int(previous_state.get("idle_rounds", 0)),
+                               kill_switch=history["kill_switch"])
     model_state = {
         "round": rnd.round_index, "stage": stage_id, "dataset": rnd.dataset_key,
         "task": task, "metric": metric_state["metric"],
@@ -236,6 +260,8 @@ def train(rnd) -> None:
     }
     decision, model_text, model_diagnostics = decide_with_receipt(
         rnd, _model_prompt(model_state), budget, history, int(rnd.round_index))
+    if late_policy:
+        decision = protect_c_attempt(decision, budget)
     audit.write("model_receipt", step=int(rnd.round_index), **model_diagnostics)
     # The host may start with an older state. Recover its spent budget from the
     # platform's round records before assigning the next request.
@@ -247,6 +273,8 @@ def train(rnd) -> None:
         remaining = max(0, task_limit - prior_spend)
         decision.update(epochs=remaining, action="finetune" if remaining else "none",
                         rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
+    if late_policy:
+        decision = pace_c_budget(decision, spent=prior_spend, round_index=int(rnd.round_index))
     log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
                   f"stage_changed={stage_changed} rule={budget['rule']} "
                   f"model={decision.get('model_action')} source={decision['source']} "
@@ -296,7 +324,8 @@ def train(rnd) -> None:
     if int(decision["epochs"]) > 0:
         try:
             log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
-                          f"calibrate_c={calibrate_c}")
+                          f"calibrate_c={calibrate_c} mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
+            use_paired = RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15")
             round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
@@ -306,13 +335,17 @@ def train(rnd) -> None:
                 learning_rate=float(decision["lr"]),
                 patience=EARLY_STOP_PATIENCE,
                 calibrate_c=calibrate_c,
+                calibration_mode=C_CALIBRATION_MODE,
+                selection_task=str(rnd.dataset_key) if use_paired else "",
+                smooth_weights=True,
                 validation_groups=validation_groups,
                 stage_id=stage_id or f"round-{rnd.round_index}",
                 hypothesis=decision["reason"],
                 change_summary=json.dumps({"rule": decision["rule"],
                                            "signals": decision["signals"]},
                                           ensure_ascii=False))
-            outcome = acceptance(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key))
+            decide_promotion = paired_acceptance if use_paired else acceptance
+            outcome = decide_promotion(round_result.metrics_before, round_result.metrics_after, task, str(rnd.dataset_key))
             gate.commit(gated.action, step=int(rnd.round_index))
             gate.note_step_ok()
             audit.write("round_result", step=int(rnd.round_index), rule=decision["rule"],
@@ -324,8 +357,6 @@ def train(rnd) -> None:
             log_to_stderr(f"training failed, keeping the parent model: {training_error}")
             shutil.rmtree(candidate_dir, ignore_errors=True)
             outcome = None
-    else:
-        training_error = "no training this round (policy or gate chose none)"
 
     selected_artifact_id = rnd.parent.artifact_id
     promoted = bool(outcome and outcome.get("promote"))
@@ -413,6 +444,9 @@ def train(rnd) -> None:
              "train_vs_validation": round(psi_holdout, 4), "prediction_js": round(pred_js, 4)},
         model_verdict=model_text, outcome=outcome, accepted=bool(outcome and outcome.get("accepted")),
         region="gate:" + ("approved" if gated.approved else gated.reason))
+    execution = execution_record(decision, round_result, promoted, training_error)
+    record["execution"] = execution
+    audit.write("execution", step=int(rnd.round_index), **execution)
     records = list(previous_state.get("decisions") or [])[-9:] + [record]
 
     next_state = {
@@ -424,6 +458,8 @@ def train(rnd) -> None:
         "round": int(rnd.round_index),
         "stage_id": stage_id or str(previous_state.get("stage_id", "")),
         "n_train": train_rows,
+        "idle_rounds": 0 if decision["epochs"] > 0 else int(previous_state.get("idle_rounds", 0)) + 1,
+        "execution": execution,
         "requested_epochs_total": prior_spend + int(decision["epochs"]),
         "n_validation": validation_rows,
         **row_state,
@@ -473,7 +509,7 @@ def train(rnd) -> None:
         f"预测JS={pred_js:.3f}。"
         f"模型裁决：{decision.get('model_action')}"
         f"（{(decision.get('model_reason') or model_text or '无文本，按规则执行')[:120]}）。"
-        f"结果：{after_text}；{'提交新候选' if promoted else '保持父模型'}"
+        f"结果：{after_text}；执行状态={execution['status']}；{'提交新候选' if promoted else '保持父模型'}"
         f"{'；训练异常=' + training_error if training_error else ''}。"
     )
     log_to_stderr(reason[:600])
@@ -484,7 +520,7 @@ def train(rnd) -> None:
                         f"lr={decision['lr']} rule={decision['rule']} "
                         f"promoted={promoted} outcome={outcome}"),
         reason=truncate_utf8(reason),
-        configuration={"rule": decision["rule"], "action": decision["action"],
+        configuration={"execution": execution, "rule": decision["rule"], "action": decision["action"],
                        "epochs": int(decision["epochs"]), "lr": float(decision["lr"]),
                        "psi_prev": round(psi_prev, 4), "psi_baseline": round(psi_baseline, 4),
                        "psi_holdout": round(psi_holdout, 4), "pred_js": round(pred_js, 4),
@@ -493,6 +529,13 @@ def train(rnd) -> None:
                        "history": history["recent"], "model_action": decision.get("model_action"),
                        "source": decision["source"], "model_receipt": model_diagnostics,
                        "release": RELEASE, "prediction_policy": "nonnegative_unbounded",
+                       **({"selection_audit": {
+                           "validation_sha256": validation_dataset["sha256"],
+                           "parent": {k: round_result.metrics_before[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_before},
+                           "candidate": {k: round_result.metrics_after[k] for k in ("macro_f1", "rmse", "nasa_log1p") if k in round_result.metrics_after},
+                           "smoothing": round_result.config["weight_smoothing"],
+                           "component_cpu_seconds": round_result.config["component_cpu_seconds"],
+                       }} if RELEASE in ("0.9", "0.9.1", "0.9.2", "0.14", "0.15") and round_result is not None else {}),
                        "accepted": bool(outcome and outcome.get("accepted")),
                        "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
                        "promoted": promoted, "gain": None if not outcome else outcome["gain"],
