@@ -195,7 +195,7 @@ class OfficialRound:
                        train_groups=None, group_alpha: float = 0.0,
                        weight_decay: float = 0.0, label_smoothing: float = 0.0,
                        calibrate_b: bool = False, fast_c_calibration: bool = False,
-                       c_nasa_tol: float = 0.0) -> RoundResult:
+                       c_nasa_tol: float = 0.0, b_downward_alpha: float | None = None) -> RoundResult:
         """Continue the parent for up to `epochs`, keeping the best-scoring weights.
 
         `patience > 0` enables early stopping: after that many epochs without a
@@ -272,6 +272,8 @@ class OfficialRound:
         if calibrate_b:
             with measured("calibration"):
                 b_cal_state = _fit_b_state(X_train, np.asarray(y_train, dtype=float), train_groups)
+            if b_cal_state is not None and b_downward_alpha is not None:
+                b_cal_state["downward_alpha"] = b_downward_alpha
         weights = balanced_sample_weights(train_groups, group_alpha)
         fit_options = {"sample_weight": weights} if weights is not None else {}
         if weight_decay:

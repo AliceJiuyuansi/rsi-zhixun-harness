@@ -11,8 +11,8 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE = "0.18"
-BUNDLE_DIR = "rsi-zhixun-harness-v18"
+RELEASE = "0.19"
+BUNDLE_DIR = "rsi-zhixun-harness-v19"
 FOLDERS = {"src", "vendor", "harness", "scripts", "tests", "configs", "docs", "reports"}
 TOP_FILES = {
     "AGENTS.md",

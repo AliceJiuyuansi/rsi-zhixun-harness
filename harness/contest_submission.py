@@ -72,8 +72,8 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 版本号用于交付记录；预测策略仍随检查点保存。
-RELEASE = os.environ.get("RSI_RELEASE", "0.18")
-ULTRA_COMPACT_RELEASES = ("0.17", "0.18")
+RELEASE = os.environ.get("RSI_RELEASE", "0.19")
+ULTRA_COMPACT_RELEASES = ("0.17", "0.18", "0.19")
 B_CALIBRATION_RELEASES = ULTRA_COMPACT_RELEASES
 C_LATE_BUDGET_RELEASES = ULTRA_COMPACT_RELEASES
 COMPACT_MODEL_RELEASES = ("0.15", "0.16") + ULTRA_COMPACT_RELEASES
@@ -405,6 +405,7 @@ def train(rnd) -> None:
                 patience=EARLY_STOP_PATIENCE,
                 calibrate_c=calibrate_c,
                 calibrate_b=calibrate_b,
+                b_downward_alpha=0.90 if calibrate_b and RELEASE == "0.19" else None,
                 fast_c_calibration=use_v17,
                 c_nasa_tol=c_nasa_tol,
                 calibration_mode=C_CALIBRATION_MODE,

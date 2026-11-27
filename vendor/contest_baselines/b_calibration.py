@@ -165,6 +165,11 @@ def predict(x, parent_prediction, state: dict) -> np.ndarray:
     z = np.clip((feat - mu) / sd, -5.0, 5.0)
     log_cal = np.clip(coef[0] + z @ coef[1:], 0.0, clip_hi)
     log_base = np.log1p(base)
+    if "downward_alpha" in state:
+        downward_alpha = float(state["downward_alpha"])
+        if not alpha <= downward_alpha <= 1.0:
+            raise ValueError("invalid downward calibration weight")
+        alpha = np.where(log_cal < log_base, downward_alpha, alpha)
     blended = np.expm1(np.clip((1.0 - alpha) * log_base + alpha * log_cal, 0.0, max(clip_hi, 12.0)))
     if not np.all(np.isfinite(blended)):
         raise ValueError("nonfinite B calibration output")
