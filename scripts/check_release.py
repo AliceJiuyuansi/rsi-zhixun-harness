@@ -154,7 +154,7 @@ def run(root, layout="source", require_sdk=False, checkpoint=None):
             result["errors"].append("missing_res_mlp_v2")
         if getattr(b_calibration, "VERSION", None) != "sign_log_v1":
             result["errors"].append("missing_b_calibration_sign_log_v1")
-        if release in ("0.17", "0.18", "0.19"):
+        if release in ("0.17", "0.18", "0.19", "0.20"):
             for attr in ("ULTRA_COMPACT_RELEASES", "B_CALIBRATION_RELEASES", "C_LATE_BUDGET_RELEASES"):
                 if release not in getattr(submission, attr, ()):
                     result["errors"].append(f"release_flag_not_enabled:{attr}")

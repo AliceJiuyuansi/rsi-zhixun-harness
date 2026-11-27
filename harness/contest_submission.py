@@ -72,8 +72,8 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 版本号用于交付记录；预测策略仍随检查点保存。
-RELEASE = os.environ.get("RSI_RELEASE", "0.19")
-ULTRA_COMPACT_RELEASES = ("0.17", "0.18", "0.19")
+RELEASE = os.environ.get("RSI_RELEASE", "0.20")
+ULTRA_COMPACT_RELEASES = ("0.17", "0.18", "0.19", "0.20")
 B_CALIBRATION_RELEASES = ULTRA_COMPACT_RELEASES
 C_LATE_BUDGET_RELEASES = ULTRA_COMPACT_RELEASES
 COMPACT_MODEL_RELEASES = ("0.15", "0.16") + ULTRA_COMPACT_RELEASES
@@ -243,8 +243,11 @@ def train(rnd) -> None:
     trainer = OfficialRound()
     validation_groups = (validation_dataset["groups"]
                          if rnd.dataset_key in ("B", "C") else None)
+    # In 0.20 metrics and drift share the parent predictions on these exact rows.
+    previous_predictions = parent_model.predict(validation_dataset["x"]) if RELEASE == "0.20" else None
     validation_before = trainer.evaluate(parent_model, validation_dataset["x"],
-                                         validation_dataset["y"], groups=validation_groups)
+                                         validation_dataset["y"], groups=validation_groups,
+                                         predictions=previous_predictions)
     metric_state = _metric_state(previous_state, validation_before, task)
 
     # --- 3. drift: against last stage, against round 1, and train vs val --
@@ -255,7 +258,8 @@ def train(rnd) -> None:
     psi_baseline = psi_against(baseline_profile, training_dataset["x"])
     psi_holdout = psi_against(current_profile, validation_dataset["x"])
 
-    previous_predictions = parent_model.predict(validation_dataset["x"])
+    if previous_predictions is None:
+        previous_predictions = parent_model.predict(validation_dataset["x"])
     prediction_now = prediction_profile(
         previous_predictions, task, class_names,
         reference_edges=(previous_state.get("pred_profile") or {}).get("edges"))
@@ -340,6 +344,8 @@ def train(rnd) -> None:
             remaining = max(0, task_limit - prior_spend)
             decision.update(epochs=remaining, action="finetune" if remaining else "none",
                             rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
+    if RELEASE == "0.20" and rnd.dataset_key == "A" and rnd.round_index > 1:
+        decision["epochs"] = min(decision["epochs"], 1)
     log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
                   f"stage_changed={stage_changed} rule={budget['rule']} "
                   f"model={decision.get('model_action')} source={decision['source']} "
@@ -422,6 +428,7 @@ def train(rnd) -> None:
             outcome = decide_promotion(
                 round_result.metrics_before, round_result.metrics_after,
                 task, str(rnd.dataset_key), c_nasa_tol=c_nasa_tol,
+                **({"audit_b_mae": True} if calibrate_b and RELEASE == "0.20" else {}),
             )
             gate.commit(gated.action, step=int(rnd.round_index))
             gate.note_step_ok()

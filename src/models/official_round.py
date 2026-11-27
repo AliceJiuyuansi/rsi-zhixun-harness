@@ -172,8 +172,8 @@ class OfficialRound:
                                                           fromlist=["checkpoint_digest"]).checkpoint_digest
 
     # --- metrics -------------------------------------------------------
-    def evaluate(self, model: "Model", X: np.ndarray, y: np.ndarray, groups=None) -> dict:
-        pred = model.predict(np.asarray(X, dtype=float))
+    def evaluate(self, model: "Model", X: np.ndarray, y: np.ndarray, groups=None, *, predictions=None) -> dict:
+        pred = model.predict(np.asarray(X, dtype=float)) if predictions is None else predictions
         if model.meta["task"] == "classification":
             labels = pred.argmax(axis=1)
             return {"accuracy": float(np.mean(labels == y)), "macro_f1": macro_f1(y, labels)}

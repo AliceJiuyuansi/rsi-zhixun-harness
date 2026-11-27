@@ -567,7 +567,7 @@ def acceptance(before: dict, after: dict, task: str, dataset_key: str = "",
 
 
 def paired_acceptance(before: dict, after: dict, task: str, dataset_key: str,
-                      *, c_nasa_tol: float = 0.0) -> dict:
+                      *, c_nasa_tol: float = 0.0, audit_b_mae: bool = False) -> dict:
     """Candidate policy: compare only paired scores on the current holdout."""
     result = acceptance(before, after, task, dataset_key, c_nasa_tol=c_nasa_tol)
     primary = "macro_f1" if dataset_key == "A" else "rmse"
@@ -578,6 +578,13 @@ def paired_acceptance(before: dict, after: dict, task: str, dataset_key: str,
         # Compare the unrounded values: a tie may advance, a real loss may not.
         noninferior = after[primary] >= before[primary] - 1e-9
         result.update(accepted=bool(noninferior), promote=bool(noninferior))
+    if audit_b_mae and dataset_key == "B":
+        old = _finite(before.get("mae"), math.nan)
+        new = _finite(after.get("mae"), math.nan)
+        delta = new - old
+        result.update(mae_before=old if math.isfinite(old) else None,
+                      mae_after=new if math.isfinite(new) else None,
+                      mae_delta=delta if math.isfinite(delta) else None)
     return result
 
 

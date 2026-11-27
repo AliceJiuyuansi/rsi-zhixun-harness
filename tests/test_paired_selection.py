@@ -20,6 +20,32 @@ def engine(rmse, log_nasa):
 
 
 class PairedSelectionTests(unittest.TestCase):
+    def test_evaluate_reuses_supplied_predictions(self):
+        x = np.arange(24.).reshape(12, 2)
+        y = np.arange(12.)
+        model = Model('regression', ['x', 'y'], [], x, y, hidden=4)
+        trainer = OfficialRound()
+        groups = ['first'] * 6 + ['second'] * 6
+        expected = trainer.evaluate(model, x, y, groups)
+        predictions = model.predict(x)
+        with patch.object(model, 'predict', side_effect=AssertionError('duplicate prediction')):
+            self.assertEqual(trainer.evaluate(model, x, y, groups, predictions=predictions), expected)
+
+    def test_b_mae_audit_is_observational(self):
+        before = {"rmse": 10., "mae": 4.}
+        for rmse, mae, promoted in [(9., 5., True), (11., 3., False)]:
+            after = {"rmse": rmse, "mae": mae}
+            legacy = paired_acceptance(before, after, "regression", "B")
+            outcome = paired_acceptance(before, after, "regression", "B", audit_b_mae=True)
+            self.assertEqual(outcome, {**legacy, "mae_before": 4., "mae_after": mae,
+                                       "mae_delta": mae - 4.})
+            self.assertEqual(outcome["promote"], promoted)
+            self.assertNotIn("mae_delta", legacy)
+        partial = paired_acceptance(before, {"rmse": 9.}, "regression", "B", audit_b_mae=True)
+        self.assertTrue(partial["promote"])
+        self.assertIsNone(partial["mae_after"])
+        self.assertIsNone(partial["mae_delta"])
+
     def test_a_keeps_ties_not_regressions(self):
         parent = {"macro_f1": .72}
         self.assertTrue(acceptance(parent, {"macro_f1": .71}, "classification", "A")["promote"])

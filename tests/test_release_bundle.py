@@ -30,7 +30,7 @@ class ReleaseBundleTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
         payload = json.loads(proc.stdout)
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["release"], "0.19")
+        self.assertEqual(payload["release"], "0.20")
 
     def test_missing_budget_and_changed_calibrators_are_detected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -66,7 +66,7 @@ class ReleaseBundleTests(unittest.TestCase):
         for rule in ("!scripts/", "!scripts/check_release.py", "!release_manifest.json", "!_sdk/"):
             self.assertIn(rule, lines)
         docker = (ROOT / "harness.Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("ARG RSI_RELEASE=0.19", docker)
+        self.assertIn("ARG RSI_RELEASE=0.20", docker)
         self.assertIn("COPY release_manifest.json /app/release_manifest.json", docker)
         self.assertIn("--layout image --require-sdk", docker)
 
@@ -93,8 +93,8 @@ class ReleaseBundleTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "harness"))
         import contest_submission as submission
 
-        self.assertEqual(submission.RELEASE, "0.19")
-        for release in ("0.17", "0.18", "0.19"):
+        self.assertEqual(submission.RELEASE, "0.20")
+        for release in ("0.17", "0.18", "0.19", "0.20"):
             self.assertTrue(submission.calibration_enabled(release))
             self.assertEqual(submission.calibration_mode(release), "res_mlp_v2")
             self.assertIn(release, submission.ULTRA_COMPACT_RELEASES)
