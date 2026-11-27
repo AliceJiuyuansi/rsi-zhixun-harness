@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK = ROOT / "_sdk" / "contest-harness-sdk-1.0.4"
+SDK = ROOT / "_sdk" / "contest-harness-sdk-1.0.5"
 sys.path.insert(0, str(SDK))
 
 from tests.support import Host  # noqa: E402

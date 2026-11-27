@@ -34,8 +34,8 @@ ENV PYTHONUNBUFFERED=1 \
     RSI_C_CALIBRATION=${RSI_C_CALIBRATION} \
     RSI_C_CAL_MODE=${RSI_C_CAL_MODE}
 
-# 1) SDK（官方 1.0.4，随平台下载包，不打网络补丁）
-COPY _sdk/contest-harness-sdk-1.0.4 /opt/contest-harness-sdk
+# 1) SDK（官方 1.0.5，随平台下载包，不打网络补丁）
+COPY _sdk/contest-harness-sdk-1.0.5 /opt/contest-harness-sdk
 RUN pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" numpy \
     && pip install --no-cache-dir /opt/contest-harness-sdk
 
