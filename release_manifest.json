@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "release": "0.17",
+  "release": "0.18",
   "runtime_sha256": {
-    "harness/contest_submission.py": "04b6836efaae0d355c4d4203d7528dea1edf9ae828197decd6a32ee69ec6a241",
+    "harness/contest_submission.py": "021ebe6feffbea4dd0427bdf958c57561154b5773f18ca2aa8b1c5c7fda2140e",
     "harness/harness.py": "3a59638647e3158e68530e5639aab77d38dfb3f7f6704ea601c6e4ec207275a5",
-    "scripts/check_release.py": "6a76452a1bd1edd1b61c23619bbb0aaf336efcf401d29abcee28fc7f2f2cf707",
+    "scripts/check_release.py": "cf4ce69fc22850548a6569e112b003bffeaa6a2411946462933d67a1128d3bc6",
     "src/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "src/eval/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "src/eval/cost.py": "c8b02f0893f65f17588d15f5aa6a06da9fd891ba30933875b42a9956bd88b190",
@@ -33,7 +33,7 @@
     "src/utils/swan.py": "fb34763de66c5137bec335e4d9afa8bfad842ee2620b8d2d646d624d35b4f072",
     "vendor/contest_baselines/__init__.py": "3363d6112a78e5b4de3508da13e543708fc6a9019c65f3c8bcecb5178a321d7a",
     "vendor/contest_baselines/b_calibration.py": "d563ee870be6e6c338ac3105398836e9b392299cf8ae73fa11411c20ac83259f",
-    "vendor/contest_baselines/c_calibration.py": "a1a66a2bfc20dcfcd38de90811b472dcb4f045b69178ea932a9f599fd36f9c26",
+    "vendor/contest_baselines/c_calibration.py": "87f5bedff687da5b77cd34380b07f38beb7f59ae89a5d6658dead4470b327ebf",
     "vendor/contest_baselines/data.py": "d77ab3df2477b01cc9e02f26c42a1de319c56bc2832786a019b955d12ed65f6c",
     "vendor/contest_baselines/model.py": "6438c56abd6f3c9b5927c961c7a7560a48c7a884ea46c3759429fe173f1e6fec",
     "vendor/contest_baselines/predict.py": "80e6787cd862dfefd85cd6bfcd73b5577dd90e202dd3d5bb9f18a52761807452",

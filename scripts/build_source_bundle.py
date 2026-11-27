@@ -1,4 +1,4 @@
-"""Build and validate a v17 source ZIP, including imports after clean extraction."""
+"""Build and validate a release source ZIP, including imports after clean extraction."""
 from __future__ import annotations
 
 import argparse
@@ -11,8 +11,8 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE = "0.17"
-BUNDLE_DIR = "rsi-zhixun-harness-v17"
+RELEASE = "0.18"
+BUNDLE_DIR = "rsi-zhixun-harness-v18"
 FOLDERS = {"src", "vendor", "harness", "scripts", "tests", "configs", "docs", "reports"}
 TOP_FILES = {
     "AGENTS.md",

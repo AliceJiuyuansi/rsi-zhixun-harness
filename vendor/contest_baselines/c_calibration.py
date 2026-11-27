@@ -48,18 +48,24 @@ def _corrected(parent, correction, shift, neg_clip=10.0, pos_clip=10.0):
     return np.maximum(0.0, parent + np.clip(correction + shift, -float(neg_clip), float(pos_clip)))
 
 
-def _metrics(error):
-    """RMSE and log of the NASA sum, without squaring or exponentiating a large tail."""
+def _rmse(error):
     scale = np.max(np.abs(error))
     if scale == 0:
-        return 0.0, -np.inf
-    rmse = scale * np.sqrt(np.mean((error / scale) ** 2))
+        return 0.0
+    return scale * np.sqrt(np.mean((error / scale) ** 2))
+
+
+def _log_nasa(error):
     exponent = np.where(error < 0, -error / 13.0, error / 10.0)
     peak = np.max(exponent)
     # expm1(t) = exp(t) * (1 - exp(-t)); the latter factor is accurate near zero.
     nasa_scaled = np.sum(np.exp(exponent - peak) * -np.expm1(-exponent))
-    log_nasa = peak + np.log(nasa_scaled) if nasa_scaled else -np.inf
-    return rmse, log_nasa
+    return peak + np.log(nasa_scaled) if nasa_scaled else -np.inf
+
+
+def _metrics(error):
+    """RMSE and log of the NASA sum, without squaring or exponentiating a large tail."""
+    return _rmse(error), _log_nasa(error)
 
 
 def _best_shift(parent, correction, y):
@@ -370,28 +376,26 @@ def _fit_endpoint(prediction, y):
     base_rmse, base_log = _metrics(prediction - y)
     if base_rmse == 0.0 or base_log == -np.inf:
         return endpoint
-    best = (base_log, 0.0, 0.0, base_rmse)
+    best_log, best_low, best_high = base_log, 0.0, 0.0
+    rmse_limit = base_rmse * (1.0 + ENDPOINT_RMSE_TOLERANCE)
+    position = np.clip((prediction - p20) / (p80 - p20), 0.0, 1.0)
     for low in ENDPOINT_GRID:
         for high in ENDPOINT_GRID:
             if low == 0 and high == 0:
                 continue
-            candidate = np.maximum(
-                0.0,
-                prediction + _endpoint_offsets(
-                    prediction, {"p20": p20, "p80": p80, "low": low, "high": high}
-                ),
-            )
-            rmse, log = _metrics(candidate - y)
-            if rmse > base_rmse * (1.0 + ENDPOINT_RMSE_TOLERANCE):
+            offset = float(low) + (float(high) - float(low)) * position
+            error = np.maximum(0.0, prediction + offset) - y
+            rmse = _rmse(error)
+            if rmse > rmse_limit:
                 continue
-            if log < best[0] - 1e-12:
-                best = (log, float(low), float(high), rmse)
-    log, low, high, _ = best
-    improved = log <= base_log + np.log(1.0 - ENDPOINT_MIN_NASA_GAIN)
+            log = _log_nasa(error)
+            if log < best_log - 1e-12:
+                best_log, best_low, best_high = log, float(low), float(high)
+    improved = best_log <= base_log + np.log(1.0 - ENDPOINT_MIN_NASA_GAIN)
     endpoint.update(
-        low=low if improved else 0.0,
-        high=high if improved else 0.0,
-        enabled=bool(improved and (low or high)),
+        low=best_low if improved else 0.0,
+        high=best_high if improved else 0.0,
+        enabled=bool(improved and (best_low or best_high)),
     )
     return endpoint
 

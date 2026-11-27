@@ -1,4 +1,4 @@
-"""Check the delivered v17 code, interfaces and optional checkpoint, without training.
+"""Check the delivered code, interfaces and optional checkpoint, without training.
 
 Uses only stdlib and NumPy. Missing SDK is reported separately unless required.
 Source paths are mapped to the Docker COPY layout for image checks.
@@ -153,10 +153,10 @@ def run(root, layout="source", require_sdk=False, checkpoint=None):
             result["errors"].append("missing_res_mlp_v2")
         if getattr(b_calibration, "VERSION", None) != "sign_log_v1":
             result["errors"].append("missing_b_calibration_sign_log_v1")
-        if release == "0.17":
+        if release in ("0.17", "0.18"):
             for attr in ("ULTRA_COMPACT_RELEASES", "B_CALIBRATION_RELEASES", "C_LATE_BUDGET_RELEASES"):
                 if release not in getattr(submission, attr, ()):
-                    result["errors"].append(f"v17_flag_not_enabled:{attr}")
+                    result["errors"].append(f"release_flag_not_enabled:{attr}")
 
         entry = root / ("contest_submission.py" if layout == "image" else "harness/contest_submission.py")
         tree = ast.parse(entry.read_text(encoding="utf-8"))

@@ -72,10 +72,10 @@ STATE_DIR = Path(os.environ.get("CONTEST_STATE_DIR", "/state"))
 EARLY_STOP_PATIENCE = 2
 MAX_UPDATES = 10                 # lifetime cap inside one 10-round dataset run
 # 版本号用于交付记录；预测策略仍随检查点保存。
-RELEASE = os.environ.get("RSI_RELEASE", "0.17")
-ULTRA_COMPACT_RELEASES = ("0.17",)
-B_CALIBRATION_RELEASES = ("0.17",)
-C_LATE_BUDGET_RELEASES = ("0.17",)
+RELEASE = os.environ.get("RSI_RELEASE", "0.18")
+ULTRA_COMPACT_RELEASES = ("0.17", "0.18")
+B_CALIBRATION_RELEASES = ULTRA_COMPACT_RELEASES
+C_LATE_BUDGET_RELEASES = ULTRA_COMPACT_RELEASES
 COMPACT_MODEL_RELEASES = ("0.15", "0.16") + ULTRA_COMPACT_RELEASES
 RES_MLP_V2_RELEASES = ("0.14",) + COMPACT_MODEL_RELEASES
 PAIRED_RELEASES = ("0.9", "0.9.1", "0.9.2") + RES_MLP_V2_RELEASES
@@ -285,7 +285,7 @@ def train(rnd) -> None:
         psi_prev=psi_prev, psi_holdout=max(psi_holdout, psi_baseline if not previous_state else 0.0),
         data_grew=data_grew, stage_changed=stage_changed, gap=metric_state["gap"],
         history=history,
-        recover_stalled_b=RELEASE in ("0.16", "0.17"),
+        recover_stalled_b=RELEASE in ("0.16",) + B_CALIBRATION_RELEASES,
         quiet_stall_a=use_v17)
     if use_c_late:
         budget = plan_c_budget(
