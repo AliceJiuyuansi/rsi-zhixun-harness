@@ -235,8 +235,14 @@ def train(rnd) -> None:
     # --- 2. public data, schema-checked against the parent checkpoint -----
     training_dataset = read_dataset(rnd.data.train_path, task, class_names or None,
                                     expected_paths=feature_paths)
-    validation_dataset = read_dataset(rnd.data.validation_path, task, class_names or None,
-                                      expected_paths=feature_paths)
+    use_training_panel = RELEASE == "0.17" and rnd.dataset_key == "A" and task == "classification"
+    panel_ok = True
+    if use_training_panel:
+        from src.harness.a_training_panel import partition
+        training_dataset, validation_dataset, panel_ok = partition(training_dataset)
+    else:
+        validation_dataset = read_dataset(rnd.data.validation_path, task, class_names or None,
+                                          expected_paths=feature_paths)
     train_rows = int(len(training_dataset["ids"]))
     validation_rows = int(len(validation_dataset["ids"]))
 
@@ -340,6 +346,8 @@ def train(rnd) -> None:
             remaining = max(0, task_limit - prior_spend)
             decision.update(epochs=remaining, action="finetune" if remaining else "none",
                             rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
+    if use_training_panel and not panel_ok:
+        decision.update(action="none", epochs=0, rule="no_independent_training_panel", source="data")
     log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
                   f"stage_changed={stage_changed} rule={budget['rule']} "
                   f"model={decision.get('model_action')} source={decision['source']} "
@@ -452,6 +460,8 @@ def train(rnd) -> None:
                             PLATFORM_APP_DIR / "vendor/contest_baselines/c_calibration.py"):
             if source_file.exists():
                 shutil.copyfile(source_file, code_snapshot_dir / source_file.name)
+        if use_training_panel:
+            shutil.copyfile(PLATFORM_APP_DIR / "src/harness/a_training_panel.py", code_snapshot_dir / "a_training_panel.py")
         candidate_receipt = rnd.submit_candidate(
             candidate_dir,
             hypothesis=truncate_utf8(decision["reason"]),
