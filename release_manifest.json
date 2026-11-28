@@ -2,7 +2,7 @@
   "schema": 1,
   "release": "0.17",
   "runtime_sha256": {
-    "harness/contest_submission.py": "bc3b82e5e6662b33be50030766e7738fefeb9b150373374ed245488fa8142870",
+    "harness/contest_submission.py": "df1de6d5671dfd275f47cd695b3d4d65e6c31a33667250bd0018bb002ddfa69e",
     "harness/harness.py": "3a59638647e3158e68530e5639aab77d38dfb3f7f6704ea601c6e4ec207275a5",
     "scripts/check_release.py": "6a76452a1bd1edd1b61c23619bbb0aaf336efcf401d29abcee28fc7f2f2cf707",
     "src/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -35,10 +35,11 @@
     "vendor/contest_baselines/b_calibration.py": "d563ee870be6e6c338ac3105398836e9b392299cf8ae73fa11411c20ac83259f",
     "vendor/contest_baselines/c_calibration.py": "a1a66a2bfc20dcfcd38de90811b472dcb4f045b69178ea932a9f599fd36f9c26",
     "vendor/contest_baselines/data.py": "d77ab3df2477b01cc9e02f26c42a1de319c56bc2832786a019b955d12ed65f6c",
-    "vendor/contest_baselines/model.py": "6438c56abd6f3c9b5927c961c7a7560a48c7a884ea46c3759429fe173f1e6fec",
+    "vendor/contest_baselines/model.py": "05e9d8c838e6f76097667b5c277b7887b42812ab883d386a5264e9f56a26a93b",
     "vendor/contest_baselines/predict.py": "80e6787cd862dfefd85cd6bfcd73b5577dd90e202dd3d5bb9f18a52761807452",
     "vendor/contest_baselines/train.py": "77043a0a944efff434a690fbe4749e9fe5601c38f98e58df116a2ef6ba13ba0a",
-    "src/harness/a_training_panel.py": "766a05f093e8e8d6d522f89d29da00adb5696031fcdbf9fa8fe527a1ccb45331"
+    "src/harness/a_training_panel.py": "766a05f093e8e8d6d522f89d29da00adb5696031fcdbf9fa8fe527a1ccb45331",
+    "src/models/a_online.py": "0efd63d5f591f7b4d4840d77b17f8b84012793e4e88fdbf477602e35cf178c79"
   },
   "purpose": "detect mixed or incomplete releases; not a cryptographic signature"
 }

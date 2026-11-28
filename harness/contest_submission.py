@@ -346,6 +346,15 @@ def train(rnd) -> None:
             remaining = max(0, task_limit - prior_spend)
             decision.update(epochs=remaining, action="finetune" if remaining else "none",
                             rule="epoch_limit", reason="Remaining per-task epoch budget", source="budget")
+    online = None
+    if use_training_panel:
+        from src.models.a_online import prepare, fit_round
+        inventory, mask, online = prepare(training_dataset, previous_state, int(rnd.round_index),
+                                          getattr(rnd, "frame", {}).get("run_id", ""), class_names)
+        if not online["eligible"]:
+            decision.update(action="none", epochs=0, rule="no_supported_new_labels", source="data")
+        elif decision["epochs"]:
+            decision["epochs"] = 1  # One closed-form fit, no Adam epoch.
     if use_training_panel and not panel_ok:
         decision.update(action="none", epochs=0, rule="no_independent_training_panel", source="data")
     log_to_stderr(f"round {rnd.round_index}: rows={train_rows} psi_prev={psi_prev:.3f} "
@@ -403,7 +412,11 @@ def train(rnd) -> None:
             log_to_stderr(f"training: epochs={decision['epochs']} lr={decision['lr']} "
                           f"calibrate_c={calibrate_c} calibrate_b={calibrate_b} "
                           f"mode={C_CALIBRATION_MODE if calibrate_c else 'none'}")
-            round_result = trainer.continue_round(
+            if use_training_panel:
+                round_result = fit_round(parent_checkpoint, training_dataset, validation_dataset, mask,
+                                         candidate_dir, stage_id, online)
+            else:
+                round_result = trainer.continue_round(
                 parent_checkpoint,
                 training_dataset["x"], training_dataset["y"],
                 validation_dataset["x"], validation_dataset["y"],
@@ -461,6 +474,7 @@ def train(rnd) -> None:
             if source_file.exists():
                 shutil.copyfile(source_file, code_snapshot_dir / source_file.name)
         if use_training_panel:
+            shutil.copyfile(PLATFORM_APP_DIR / "src/models/a_online.py", code_snapshot_dir / "a_online.py")
             shutil.copyfile(PLATFORM_APP_DIR / "src/harness/a_training_panel.py", code_snapshot_dir / "a_training_panel.py")
         candidate_receipt = rnd.submit_candidate(
             candidate_dir,
@@ -574,6 +588,9 @@ def train(rnd) -> None:
         "clock_seconds": round(float(previous_state.get("clock_seconds", 0.0))
                                + time.time() - round_started_at, 2),
     }
+    if online is not None:
+        next_state["a_fit_inventory"] = inventory
+        next_state["a_online"] = online
     next_round_state_dir = WORKSPACE / f"state-round-{rnd.round_index}"
     shutil.rmtree(next_round_state_dir, ignore_errors=True)
     next_round_state_dir.mkdir(parents=True, exist_ok=True)
@@ -622,6 +639,7 @@ def train(rnd) -> None:
                            "smoothing": round_result.config["weight_smoothing"],
                            "component_cpu_seconds": round_result.config["component_cpu_seconds"],
                        }} if use_paired and round_result is not None else {}),
+                       **({"a_online": online} if online is not None else {}),
                        "accepted": bool(outcome and outcome.get("accepted")),
                        "calibrate_c": bool(round_result and round_result.config.get("calibrate_c")),
                        "calibrate_b": bool(round_result and round_result.config.get("calibrate_b")),

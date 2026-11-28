@@ -93,7 +93,13 @@ class Model:
 
     def forward(self, x):
         hidden = np.tanh(x @ self.params["w1"] + self.params["b1"])
-        return hidden, hidden @ self.params["w2"] + self.params["b2"]
+        logits = hidden @ self.params["w2"] + self.params["b2"]
+        if "a_online_residual_v1" in self.meta:
+            weights = np.asarray(self.meta["a_online_residual_v1"], dtype=float)
+            if self.meta.get("profile") != "A" or weights.shape != (hidden.shape[1] + 1, logits.shape[1]) or not np.isfinite(weights).all():
+                raise ValueError("invalid A online residual")
+            logits += hidden @ weights[:-1] + weights[-1]
+        return hidden, logits
 
     def fit(self, x, y, epochs, *, sample_weight=None, weight_decay=0.0, label_smoothing=0.0):
         if type(epochs) is not int or not 1 <= epochs <= 10000:
